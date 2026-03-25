@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多人連線克朗棋</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: sans-serif;}
+        canvas { box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h3>克朗棋原型</h3>
+        <p>拖曳滑鼠擊打紅色打擊子 (Striker)</p>
+        <p>開啟兩個分頁即可測試連線</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
