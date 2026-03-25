@@ -33,6 +33,11 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('opponentStrike', data);
     });
 
+    //🔥 接收狀態同步數據並廣播給其他人
+    socket.on('syncState', (state) => {
+        socket.broadcast.emit('syncState', state);
+    });
+
     socket.on('disconnect', () => {
         console.log('玩家已斷線:', socket.id);
     });
