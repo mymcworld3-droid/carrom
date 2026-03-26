@@ -4,7 +4,11 @@ const WIDTH = 600;
 const HEIGHT = 600;
 
 // 1. 初始化物理引擎
-const engine = Engine.create();
+//🔥 提高物理引擎的運算迭代次數，能大幅增加碰撞與邊界判定的精準度
+const engine = Engine.create({
+    positionIterations: 8,
+    velocityIterations: 8
+});
 engine.world.gravity.y = 0; // 俯視圖，無重力
 
 // 2. 初始化渲染器
@@ -24,13 +28,16 @@ Render.run(render);
 const runner = Runner.create();
 Runner.run(runner, engine);
 
+JavaScript
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
 const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6 };
+
+//🔥 加厚牆壁厚度到 100px 並向外偏移。畫面上看起來一樣是 20px 的邊框，但物理上是一堵厚牆，徹底防止高速穿透
 const walls = [
-    Bodies.rectangle(WIDTH/2, 10, WIDTH, 20, wallOptions), // 上
-    Bodies.rectangle(WIDTH/2, HEIGHT-10, WIDTH, 20, wallOptions), // 下
-    Bodies.rectangle(10, HEIGHT/2, 20, HEIGHT, wallOptions), // 左
-    Bodies.rectangle(WIDTH-10, HEIGHT/2, 20, HEIGHT, wallOptions) // 右
+    Bodies.rectangle(WIDTH/2, -30, WIDTH + 200, 100, wallOptions), // 上
+    Bodies.rectangle(WIDTH/2, HEIGHT + 30, WIDTH + 200, 100, wallOptions), // 下
+    Bodies.rectangle(-30, HEIGHT/2, 100, HEIGHT + 200, wallOptions), // 左
+    Bodies.rectangle(WIDTH + 30, HEIGHT/2, 100, HEIGHT + 200, wallOptions) // 右
 ];
 
 // 建立四個角落的球洞
