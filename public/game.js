@@ -54,21 +54,71 @@ const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, {
     render: { fillStyle: '#ff4757', strokeStyle: '#fff', lineWidth: 2 } 
 });
 
-// 目標棋子 (Pucks) - 較小
+//🔥 目標棋子 (Pucks) - 黑白紅標準六角形排法
 const pucks = [];
-for (let i = 0; i < 9; i++) {
-    const angle = (i / 9) * Math.PI * 2;
-    const dist = 50;
-    pucks.push(Bodies.circle(WIDTH/2 + Math.cos(angle) * dist, HEIGHT/2 + Math.sin(angle) * dist, 12, { 
-        id: i + 100,
-        label: 'puck',
-        restitution: 0.8, 
-        frictionAir: 0.015,
-        render: { fillStyle: (i === 0) ? '#ff9f43' : '#2f3542' } // 中間一個是黃色的
+const cx = WIDTH / 2;
+const cy = HEIGHT / 2;
+const puckRadius = 12;
+const gap = 24.5; //🔥 稍微大於直徑(24)一點點，避免物理引擎剛載入時因邊緣重疊而爆開
+let puckId = 100;
+
+//🔥 定義標準顏色
+const colorQueen = '#ff9f43'; // 皇后 (紅/橘)
+const colorWhite = '#f5f6fa'; // 白棋
+const colorBlack = '#2f3542'; // 黑棋
+
+const puckOptions = {
+    label: 'puck',
+    restitution: 0.8, 
+    frictionAir: 0.015
+};
+
+//🔥 1. 中心皇后 (1顆)
+pucks.push(Bodies.circle(cx, cy, puckRadius, { 
+    ...puckOptions, 
+    id: puckId++, 
+    render: { fillStyle: colorQueen } 
+}));
+
+//🔥 2. 內圈 (6顆，交替顏色)
+for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3;
+    const x = cx + Math.cos(angle) * gap;
+    const y = cy + Math.sin(angle) * gap;
+    const color = (i % 2 === 0) ? colorWhite : colorBlack;
+    pucks.push(Bodies.circle(x, y, puckRadius, { 
+        ...puckOptions, 
+        id: puckId++, 
+        render: { fillStyle: color } 
     }));
 }
 
-// 將球洞 pockets 加入物理世界
+//🔥 3. 外圈 (12顆)
+//🔥 為了達到標準的 9白 9黑，並形成白棋的 Y 字型，外圈的 6 個「角」為白，6 個「邊中點」為黑
+for (let i = 0; i < 12; i++) {
+    const angle = (i * Math.PI) / 6;
+    let dist, color;
+    
+    if (i % 2 === 0) {
+        // 角落 (0, 60, 120...度)
+        dist = gap * 2;
+        color = colorWhite;
+    } else {
+        // 邊緣中點 (30, 90, 150...度)
+        dist = gap * Math.sqrt(3);
+        color = colorBlack;
+    }
+    
+    const x = cx + Math.cos(angle) * dist;
+    const y = cy + Math.sin(angle) * dist;
+    pucks.push(Bodies.circle(x, y, puckRadius, { 
+        ...puckOptions, 
+        id: puckId++, 
+        render: { fillStyle: color } 
+    }));
+}
+
+// 將球洞、棋子加入物理世界
 Composite.add(engine.world, [...walls, ...pockets, striker, ...pucks]);
 
 // 5. 處理進洞邏輯 (偵測碰撞)
