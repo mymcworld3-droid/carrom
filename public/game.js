@@ -384,7 +384,7 @@ Events.on(render, 'afterRender', () => {
     ctx.fill();
     ctx.restore();
 
-    //🔥 2. 繪製下方與上方的發球線區域 (基準線)
+    // 2. 繪製下方與上方的發球線區域 (基準線)
     ctx.beginPath();
     // 畫下方咖啡色細線 (玩家 1)
     ctx.moveTo(100, HEIGHT * 0.8);
@@ -396,15 +396,27 @@ Events.on(render, 'afterRender', () => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // 畫深咖啡色細線兩端的小圓
-    ctx.beginPath();
-    // 下方兩端
-    ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
-    ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
-    // 上方兩端
-    ctx.arc(100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
-    ctx.arc(WIDTH - 100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
+    //🔥 修正：畫深咖啡色細線兩端的小圓 (必須分開起筆，否則會連成巨大的沙漏多邊形)
     ctx.fillStyle = '#3e2723'; // 深咖啡色
+    
+    //🔥 下方左端
+    ctx.beginPath();
+    ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    //🔥 下方右端
+    ctx.beginPath();
+    ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    //🔥 上方左端
+    ctx.beginPath();
+    ctx.arc(100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    //🔥 上方右端
+    ctx.beginPath();
+    ctx.arc(WIDTH - 100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
     ctx.fill();
 
     // 3. 正確的棋子圖層層級排序與繪製
