@@ -42,36 +42,52 @@ io.on('connection', (socket) => {
     });
 
     //🔥 接收前端請求 AI 進行回合
-    //🔥 接收前端請求 AI 進行回合
     socket.on('requestAIMove', async (gameState) => {
         try {
             //🔥 立即回傳狀態：讓前端知道伺服器正在處理
-            socket.emit('aiStatus', '正在觀察盤面與思考策略 (約需 2~4 秒)...');
+            socket.emit('aiStatus', '正在進行物理運算與策略規劃...');
 
-            //🔥 新增：檢查 API Key 是否存在，若無則立即報錯，避免 SDK 陷入無限等待
+            //🔥 檢查 API Key 是否存在
             if (!process.env.GEMINI_API_KEY) {
                 throw new Error("伺服器遺失 GEMINI_API_KEY！請至 Render 後台設定 Environment Variables。");
             }
 
+            //🔥 大幅強化的物理與規則 Prompt
             const prompt = `
-            你是一個正在玩克朗棋 (Carrom) 的對手。你是上方玩家 (Player 2)。你的目標是把【白棋】打進球洞。
-            棋盤大小是 600x600。
-            球洞座標在四個角落：(30,30), (570,30), (30,570), (570,570)。
-            你的發球線(Striker)被固定在 Y=120。你可以決定的 X 座標範圍是 120 到 480。
-            你的打擊力度最大不可超過 0.8。因為你往下方打，所以 forceY 必須大於 0。
+            你是一個正在玩物理克朗棋 (Carrom) 的專業 AI。你是上方玩家 (Player 2)。
+            你的目標是將【白棋】打進球洞。請以最快速度給出最佳打擊參數。
+
+            【物理引擎與棋盤參數】
+            - 棋盤大小：600x600，無重力俯視圖。
+            - 邊界牆壁：彈性(restitution)=0.6，無摩擦力。
+            - 球洞座標：左上(30,30)、右上(570,30)、左下(30,570)、右下(570,570)。進洞判定為與球洞中心距離 < 25。
+            - 打擊子(Striker)：半徑=20，質量(mass)=15，彈性=0.6，空氣阻力=0.008，摩擦力=0.01。
+            - 目標棋子(Puck)：半徑=12，質量(mass)=5，彈性=0.8，空氣阻力=0.004，摩擦力=0.01。
+            *(注意：打擊子質量是棋子的3倍，撞擊後動能傳遞非常強烈)*
+
+            【你的操作限制】
+            1. 你的打擊子必須擺在發球線上 (Y=120)，可決定的 X 座標範圍為 120 到 480。
+            2. 你往下方擊球，所以施力方向 forceY 必須大於 0。
+            3. 總施力向量大小 sqrt(forceX^2 + forceY^2) 絕對不可超過 0.8。
+
+            【嚴格比賽規則 (重要!)】
+            1. 首要目標：把白棋打進任何一個球洞。
+            2. 犯規避讓：若你還有白棋在場上，【絕對不能】把紅色的皇后(Queen)打進洞，否則視為犯規並罰球。
+            3. 母球洗澡：【絕對不能】讓你的打擊子(Striker)掉進球洞，否則會喪失球權並罰球。
             
-            目前盤面狀態：
-            目標白棋座標：${JSON.stringify(gameState.whitePucks)}
-            障礙黑棋座標：${JSON.stringify(gameState.blackPucks)}
-            皇后座標：${JSON.stringify(gameState.queen)}
-            
-            請計算出最佳的打擊方式，並嚴格只回傳 JSON 格式如下，不要有任何多餘文字：
+            【目前盤面狀態】
+            - 剩餘白棋座標：${JSON.stringify(gameState.whitePucks)}
+            - 黑棋座標 (障礙物)：${JSON.stringify(gameState.blackPucks)}
+            - 皇后座標：${JSON.stringify(gameState.queen)}
+
+            請運用幾何反射角與質量推算，找出最安全的進球路徑。
+            嚴格只回傳 JSON 格式如下，不要包含 Markdown 標籤(\`\`\`json)或其他任何文字：
             {"strikerX": 300, "forceX": 0.05, "forceY": 0.5}
             `;
 
-            // 呼叫 Gemini 模型
+            //🔥 呼叫你擁有的 gemini-2.5-flash 模型
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.5-flash', //🔥 修改為你清單中有的 2.5 flash
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
@@ -79,7 +95,7 @@ io.on('connection', (socket) => {
             });
 
             //🔥 思考完畢，準備回傳動作
-            socket.emit('aiStatus', '思考完畢！正在擺放打擊子...');
+            socket.emit('aiStatus', '計算完成！準備出桿...');
 
             const move = JSON.parse(response.text);
             socket.emit('aiMove', move);
