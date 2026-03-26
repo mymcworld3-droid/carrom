@@ -52,37 +52,40 @@ io.on('connection', (socket) => {
                 throw new Error("伺服器遺失 GROQ_API_KEY！請至 Render 後台設定 Environment Variables。");
             }
 
-            //🔥 大幅強化的物理與規則 Prompt
+            //🔥 大幅強化的 Prompt：加入思考步驟 (Chain of Thought)
             const prompt = `
             你是一個正在玩物理克朗棋 (Carrom) 的專業 AI。你是上方玩家 (Player 2)。
-            你的目標是將【白棋】打進球洞。請以最快速度給出最佳打擊參數。
+            你的目標是將【白棋】打進球洞。請分析盤面並給出最聰明的打擊參數。
 
             【物理引擎與棋盤參數】
             - 棋盤大小：600x600，無重力俯視圖。
             - 邊界牆壁：彈性(restitution)=0.6，無摩擦力。
-            - 球洞座標：左上(30,30)、右上(570,30)、左下(30,570)、右下(570,570)。進洞判定為與球洞中心距離 < 25。
-            - 打擊子(Striker)：半徑=20，質量(mass)=15，彈性=0.6，空氣阻力=0.008，摩擦力=0.01。
-            - 目標棋子(Puck)：半徑=12，質量(mass)=5，彈性=0.8，空氣阻力=0.004，摩擦力=0.01。
-            *(注意：打擊子質量是棋子的3倍，撞擊後動能傳遞非常強烈)*
+            - 左下球洞：(30,570)，右下球洞：(570,570)。進洞判定為距離 < 25。
+            - 打擊子(Striker)：被限制在發球線 Y=120，X可選範圍 120 到 480。最大總力道 0.8。往下打 forceY 必須 > 0。
 
-            【你的操作限制】
-            1. 你的打擊子必須擺在發球線上 (Y=120)，可決定的 X 座標範圍為 120 到 480。
-            2. 你往下方擊球，所以施力方向 forceY 必須大於 0。
-            3. 總施力向量大小 sqrt(forceX^2 + forceY^2) 絕對不可超過 0.8。
-
-            【嚴格比賽規則 (重要!)】
+            【嚴格比賽規則】
             1. 首要目標：把白棋打進任何一個球洞。
-            2. 犯規避讓：若你還有白棋在場上，【絕對不能】把紅色的皇后(Queen)打進洞，否則視為犯規並罰球。
-            3. 母球洗澡：【絕對不能】讓你的打擊子(Striker)掉進球洞，否則會喪失球權並罰球。
+            2. 犯規避讓：若你還有白棋在場上，絕對不能把紅色的皇后(Queen)打進洞。
+            3. 母球洗澡：絕對不能讓你的打擊子(Striker)掉進球洞。
             
             【目前盤面狀態】
             - 剩餘白棋座標：${JSON.stringify(gameState.whitePucks)}
             - 黑棋座標 (障礙物)：${JSON.stringify(gameState.blackPucks)}
             - 皇后座標：${JSON.stringify(gameState.queen)}
 
-            請運用幾何反射角與質量推算，找出能進最多球的路徑的進球路徑。
-            嚴格只回傳 JSON 格式如下，必須是有效的 JSON object：
-            {"strikerX": , "forceX": , "forceY": }
+            【重要思考步驟】
+            請你在回傳 JSON 前，先在 "reasoning" 欄位中進行以下思考：
+            1. 挑選目標：哪一顆白棋離左下(30,570)或右下(570,570)最近且路徑沒有被黑棋擋住？
+            2. 定位母球：打擊子(Striker)的 X 座標應該擺在哪裡，才能與目標白棋形成最佳撞擊角度？
+            3. 力道計算：forceX (左右，可為正負值) 與 forceY (向下，必須大於0) 該給多少？如果目標在左邊，forceX為負；在右邊，forceX為正。
+
+            嚴格只回傳 JSON 格式如下，必須是有效的 JSON object，不要有其他廢話：
+            {
+              "reasoning": "我觀察到座標(x,y)的白棋離左下角球洞最近，且無黑棋阻擋。我將打擊子擺在 X=...，並施加向左下方的力道。",
+              "strikerX": 250,
+              "forceX": -0.25,
+              "forceY": 0.6
+            }
             `;
 
             //🔥 呼叫 Groq API，開啟 json_object 模式確保格式正確
@@ -90,7 +93,7 @@ io.on('connection', (socket) => {
                 messages: [
                     {
                         role: "system",
-                        content: "你是一個專業的物理運算 AI，請嚴格輸出 JSON 格式的數據。"
+                        content: "你是一個專業的物理運算 AI，請嚴格輸出包含 reasoning 的 JSON 格式。"
                     },
                     {
                         role: "user",
@@ -99,13 +102,18 @@ io.on('connection', (socket) => {
                 ],
                 model: "llama-3.3-70b-versatile",
                 response_format: { type: "json_object" },
-                temperature: 0.1
+                temperature: 0.7 //🔥 提高溫度：讓 AI 變得更靈活、更願意嘗試不同角度的球
             });
+
+            // 解析 AI 的回應
+            const move = JSON.parse(chatCompletion.choices[0].message.content);
+            
+            //🔥 將 AI 的思考過程列印在伺服器端 (或者你也可以透過 emit 傳給前端看)
+            console.log("AI 思考邏輯:", move.reasoning);
 
             //🔥 思考完畢，準備回傳動作
             socket.emit('aiStatus', '計算完成！準備出桿...');
 
-            const move = JSON.parse(chatCompletion.choices[0].message.content);
             socket.emit('aiMove', move);
         } catch (error) {
             console.error("AI 錯誤，採用隨機打擊:", error);
