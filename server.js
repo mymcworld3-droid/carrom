@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
 
             //🔥 呼叫你擁有的 gemini-2.5-flash 模型
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash', //🔥 修改為你清單中有的 2.5 flash
+                model: 'gemini-3-flash', //🔥 修改為你清單中有的 2.5 flash
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
