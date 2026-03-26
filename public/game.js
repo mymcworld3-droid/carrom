@@ -1,13 +1,12 @@
-const { Engine, Render, Runner, Bodies, Composite, Mouse, Vector, Body, Events } = Matter;
+const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events } = Matter;
 
 const WIDTH = 600;
 const HEIGHT = 600;
 
 // 1. 初始化物理引擎
-//🔥 提高物理引擎的運算迭代次數，能大幅增加碰撞與邊界判定的精準度
 const engine = Engine.create({
-    positionIterations: 8,
-    velocityIterations: 8
+    positionIterations: 10, //🔥 提高精確度，防止高速穿透
+    velocityIterations: 10
 });
 engine.world.gravity.y = 0; // 俯視圖，無重力
 
@@ -20,7 +19,9 @@ const render = Render.create({
         height: HEIGHT,
         wireframes: false, // 顯示實心物體
         background: '#e0c097', // 木質棋盤色
-        showAngleIndicator: false
+        showAngleIndicator: false,
+        //🔥 啟用自定義渲染，這樣我們才能自己動手畫更好看的元素
+        hasBounds: true
     }
 });
 
@@ -29,10 +30,9 @@ const runner = Runner.create();
 Runner.run(runner, engine);
 
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
-//🔥 將牆壁的接觸摩擦力 friction 設為 0，確保碰撞反彈不掉速
-const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 };
+const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 }; //🔥 將摩擦力 friction 設為 0
 
-//🔥 加厚牆壁厚度到 100px 並向外偏移。畫面上看起來一樣是 20px 的邊框，但物理上是一堵厚牆，徹底防止高速穿透
+// 加厚牆壁厚度到 100px 並向外偏移。畫面上看起來一樣是 20px 的邊框，但物理上是一堵厚牆，徹底防止高速穿透
 const walls = [
     Bodies.rectangle(WIDTH/2, -30, WIDTH + 200, 100, wallOptions), // 上
     Bodies.rectangle(WIDTH/2, HEIGHT + 30, WIDTH + 200, 100, wallOptions), // 下
@@ -42,7 +42,8 @@ const walls = [
 
 // 建立四個角落的球洞
 const pocketRadius = 30;
-const pocketOptions = { isStatic: true, isSensor: true, label: 'pocket', render: { fillStyle: '#2d3436' } };
+//🔥 給球洞加一點內部陰影效果， label 用來辨識球洞
+const pocketOptions = { isStatic: true, isSensor: true, label: 'pocket', render: { fillStyle: '#1a1a1a' } };
 const pockets = [
     Bodies.circle(30, 30, pocketRadius, pocketOptions),
     Bodies.circle(WIDTH-30, 30, pocketRadius, pocketOptions),
@@ -52,14 +53,24 @@ const pockets = [
 
 // 4. 建立棋子
 
-// 打擊子 (Striker) - 較大
+//🔥 定義棋子外觀顏色 (使用更有質感的色調)
+const colorQueen = '#d35400'; // 皇后 (紅/橘)
+const colorWhite = '#ecf0f1'; // 白棋
+const colorBlack = '#2c3e50'; // 黑棋
+const colorStriker = '#c0392b'; // 打擊子 (深紅)
+
+// 打擊子 (Striker) - 較大，設定質量
 const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, { 
     label: 'striker',
     restitution: 0.6, 
-    frictionAir: 0.008, //🔥 降低表面滑行阻力 (原本 0.02)
+    frictionAir: 0.008, //🔥 降低表面滑行阻力
     friction: 0.01,     //🔥 降低接觸摩擦力
-    mass: 15,
-    render: { fillStyle: '#ff4757', strokeStyle: '#fff', lineWidth: 2 } 
+    mass: 15, // 打擊子質量為棋子的 3 倍
+    render: { 
+        fillStyle: colorStriker, 
+        strokeStyle: '#f39c12', //🔥 金色細邊框
+        lineWidth: 3
+    } 
 });
 
 // 目標棋子 (Pucks) - 黑白紅標準六角形排法
@@ -70,24 +81,23 @@ const puckRadius = 12;
 const gap = 24.5; // 稍微大於直徑(24)一點點，避免物理引擎剛載入時因邊緣重疊而爆開
 let puckId = 100;
 
-// 定義標準顏色
-const colorQueen = '#ff9f43'; // 皇后 (紅/橘)
-const colorWhite = '#f5f6fa'; // 白棋
-const colorBlack = '#2f3542'; // 黑棋
-
+//🔥 定義普通棋子與皇后的物理屬性
 const puckOptions = {
     label: 'puck',
     restitution: 0.8, 
-    frictionAir: 0.004, //🔥 大幅降低棋子的表面滑行阻力 (原本 0.015)，讓炸球效果更明顯
+    frictionAir: 0.004, //🔥 大幅降低普通棋子的表面滑行阻力
     friction: 0.01,     //🔥 降低接觸摩擦力
-    mass: 5
+    mass: 5, // 普通棋子質量為 5
+    render: {
+        lineWidth: 1 // 用於繪製棋子圓環凹槽
+    }
 };
 
 // 1. 中心皇后 (1顆)
 pucks.push(Bodies.circle(cx, cy, puckRadius, { 
     ...puckOptions, 
     id: puckId++, 
-    render: { fillStyle: colorQueen } 
+    render: { fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 } //🔥 加入凹槽線
 }));
 
 // 2. 內圈 (6顆，交替顏色)
@@ -99,7 +109,7 @@ for (let i = 0; i < 6; i++) {
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
-        render: { fillStyle: color } 
+        render: { fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } 
     }));
 }
 
@@ -124,7 +134,7 @@ for (let i = 0; i < 12; i++) {
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
-        render: { fillStyle: color } 
+        render: { fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } 
     }));
 }
 
@@ -157,13 +167,11 @@ Events.on(engine, 'collisionStart', (event) => {
 
 // 6. 互動邏輯 (打擊)
 
-// 6. 互動邏輯 (打擊)
-
 let isDragging = false;
 let startPoint = null;
 let mousePos = { x: 0, y: 0 };
 let isMoving = false; // 防止移動中重複擊打
-let turnActive = false; //🔥 新增變數：記錄是否剛擊打過，用來判定何時重置紅球
+let turnActive = false; // 新增變數：記錄是否剛擊打過，用來判定何時重置紅球
 
 // 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
 window.addEventListener('pointermove', (e) => {
@@ -232,42 +240,106 @@ Events.on(engine, 'afterUpdate', () => {
 
     isMoving = anyMoving;
 
-    //🔥 如果所有球都已經靜止，且是擊球後的回合，則重置紅球位置
+    // 如果所有球都已經靜止，且是擊球後的回合，則重置紅球位置
     if (!isMoving && turnActive) {
-        turnActive = false; //🔥 結束這回合的追蹤狀態
+        turnActive = false; // 結束這回合的追蹤狀態
         
-        //🔥 把紅球強制放回發球區中心
+        // 把紅球強制放回發球區中心
         Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
         Body.setVelocity(striker, { x: 0, y: 0 });
     }
 });
 
-// 8. 視覺化拉力線與棋盤線 (自定義渲染)
+//🔥 8. 自定義繪製與視覺化升級
+//🔥 我們將在這裡親手繪製更有質感的棋子、棋盤圖案與拉力線
 Events.on(render, 'afterRender', () => {
     const ctx = render.context;
     
-    // 畫棋盤中心圓
+    //🔥 1. 繪製精緻的棋盤中心玫瑰花紋圖案 (替換原本的中心圓)
+    ctx.save();
+    ctx.translate(WIDTH/2, HEIGHT/2);
     ctx.beginPath();
-    ctx.arc(WIDTH/2, HEIGHT/2, 60, 0, 2 * Math.PI);
-    ctx.strokeStyle = '#5d4037';
+    // 繪製8個花瓣
+    for (let i = 0; i < 8; i++) {
+        ctx.rotate(Math.PI / 4);
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(20, -50, 40, -50, 0, -80);
+        ctx.bezierCurveTo(-40, -50, -20, -50, 0, 0);
+    }
+    ctx.strokeStyle = 'rgba(93, 64, 55, 0.4)'; //🔥 使用半透明的深褐色，看起來像木頭雕刻
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // 畫中心小圓
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0, 2 * Math.PI);
+    ctx.fillStyle = '#d35400';
+    ctx.fill();
+    ctx.restore();
+
+    //🔥 2. 繪製底部的發球線區域 (替換原本的實心線)
+    ctx.beginPath();
+    // 畫一條金色細線
+    ctx.moveTo(100, HEIGHT * 0.8);
+    ctx.lineTo(WIDTH - 100, HEIGHT * 0.8);
+    ctx.strokeStyle = 'rgba(241, 196, 15, 0.6)'; //🔥 半透明金色
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // 畫金色細線兩端的小圓
+    ctx.beginPath();
+    ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
+    ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = '#f1c40f';
+    ctx.fill();
+
+    //🔥 3. 繪製所有目標棋子 (Pucks) 的實體質感 (圓環凹槽與光澤)
+    pucks.forEach(p => {
+        // 只有還在棋盤上的棋子才需要畫
+        if (p.position.x === -100) return;
+
+        const pos = p.position;
+        const radius = p.circleRadius;
+        const color = p.render.fillStyle;
+
+        // 畫棋子本體 (Matter.js 已經幫我們畫了基底，我們這裡加上凹槽細節)
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius - 3, 0, 2 * Math.PI); //🔥 畫一個較小的同心圓
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'; //🔥 極細微的凹槽陰影
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        //🔥 加入一個微小的高光 (圓弧線)，營造光澤感
+        ctx.beginPath();
+        ctx.arc(pos.x - radius/3, pos.y - radius/3, radius/3, 1 * Math.PI, 1.5 * Math.PI);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // 半透明白色高光
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+
+    //🔥 4. 繪製打擊子 (Striker) 的精緻質感 (金色圓環凹槽與高光)
+    const posS = striker.position;
+    const radS = striker.circleRadius;
+    ctx.beginPath();
+    // 畫金色同心圓環
+    ctx.arc(posS.x, posS.y, radS - 5, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)'; // 半透明金色凹槽
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // 畫底部的發球線區域
+    //🔥 加入高光 (圓弧線)，營造光澤感
     ctx.beginPath();
-    ctx.moveTo(100, HEIGHT * 0.8);
-    ctx.lineTo(WIDTH - 100, HEIGHT * 0.8);
-    ctx.strokeStyle = 'rgba(93, 64, 55, 0.5)';
-    ctx.lineWidth = 20;
+    ctx.arc(posS.x - radS/3, posS.y - radS/3, radS/3, 1 * Math.PI, 1.5 * Math.PI);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // 半透明白色高光
+    ctx.lineWidth = 3;
     ctx.stroke();
 
+    // 5. 繪製拉力線 (拖曳時顯示)
     if (isDragging && startPoint) {
         ctx.beginPath();
         ctx.moveTo(startPoint.x, startPoint.y);
         ctx.lineTo(mousePos.x, mousePos.y);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.lineWidth = 4;
-        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = 'rgba(241, 196, 15, 0.7)'; //🔥 使用金色拉力線
+        ctx.lineWidth = 5; //🔥 稍微加粗一點
+        ctx.setLineDash([8, 8]); //🔥 調整虛線比例
         ctx.stroke();
         ctx.setLineDash([]);
     }
