@@ -97,10 +97,13 @@ Events.on(engine, 'collisionStart', (event) => {
 
 // 6. 互動邏輯 (打擊)
 
+// 6. 互動邏輯 (打擊)
+
 let isDragging = false;
 let startPoint = null;
 let mousePos = { x: 0, y: 0 };
 let isMoving = false; // 防止移動中重複擊打
+let turnActive = false; //🔥 新增變數：記錄是否剛擊打過，用來判定何時重置紅球
 
 // 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
 window.addEventListener('pointermove', (e) => {
@@ -134,12 +137,12 @@ window.addEventListener('pointerup', (e) => {
     const endX = e.clientX - rect.left;
     const endY = e.clientY - rect.top;
 
-    // 🔥 計算反向力：大幅調降力道基數，避免物理引擎穿透
+    // 計算反向力：大幅調降力道基數，避免物理引擎穿透
     const forceMultiplier = 0.005; 
     let forceX = (startPoint.x - endX) * forceMultiplier;
     let forceY = (startPoint.y - endY) * forceMultiplier;
 
-    // 🔥 限制最大力道，防止玩家拉太遠導致球速過快飛出邊界
+    // 限制最大力道，防止玩家拉太遠導致球速過快飛出邊界
     const maxForce = 0.8;
     const currentForce = Math.sqrt(forceX * forceX + forceY * forceY);
     if (currentForce > maxForce) {
@@ -151,6 +154,11 @@ window.addEventListener('pointerup', (e) => {
 
     // 應用物理力到 striker
     Body.applyForce(striker, striker.position, forceVector);
+
+    //🔥 延遲一點點再標記回合進行中，確保物理引擎已經賦予球體速度
+    setTimeout(() => {
+        turnActive = true;
+    }, 50);
 });
 
 // 7. 檢查是否所有棋子都靜止
@@ -163,6 +171,15 @@ Events.on(engine, 'afterUpdate', () => {
     });
 
     isMoving = anyMoving;
+
+    //🔥 如果所有球都已經靜止，且是擊球後的回合，則重置紅球位置
+    if (!isMoving && turnActive) {
+        turnActive = false; //🔥 結束這回合的追蹤狀態
+        
+        //🔥 把紅球強制放回發球區中心
+        Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
+        Body.setVelocity(striker, { x: 0, y: 0 });
+    }
 });
 
 // 8. 視覺化拉力線與棋盤線 (自定義渲染)
