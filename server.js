@@ -4,9 +4,9 @@ const { Server } = require('socket.io');
 const path = require('path');
 require('dotenv').config(); //🔥 載入環境變數
 
-//🔥 初始化 Gemini AI
-const { GoogleGenAI } = require('@google/genai');
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+//🔥 初始化 Groq AI
+const Groq = require('groq-sdk');
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const app = express();
 const server = http.createServer(app);
@@ -48,8 +48,8 @@ io.on('connection', (socket) => {
             socket.emit('aiStatus', '正在進行物理運算與策略規劃...');
 
             //🔥 檢查 API Key 是否存在
-            if (!process.env.GEMINI_API_KEY) {
-                throw new Error("伺服器遺失 GEMINI_API_KEY！請至 Render 後台設定 Environment Variables。");
+            if (!process.env.GROQ_API_KEY) {
+                throw new Error("伺服器遺失 GROQ_API_KEY！請至 Render 後台設定 Environment Variables。");
             }
 
             //🔥 大幅強化的物理與規則 Prompt
@@ -80,24 +80,32 @@ io.on('connection', (socket) => {
             - 黑棋座標 (障礙物)：${JSON.stringify(gameState.blackPucks)}
             - 皇后座標：${JSON.stringify(gameState.queen)}
 
-            請運用幾何反射角與質量推算，找出最安全的進球路徑。請以最快的速度回傳，越快越好。
-            嚴格只回傳 JSON 格式如下，不要包含 Markdown 標籤(\`\`\`json)或其他任何文字：
+            請運用幾何反射角與質量推算，找出最安全的進球路徑。
+            嚴格只回傳 JSON 格式如下，必須是有效的 JSON object：
             {"strikerX": 300, "forceX": 0.05, "forceY": 0.5}
             `;
 
-            //🔥 呼叫你擁有的 gemini-2.5-flash 模型
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash', //🔥 修改為你清單中有的 2.5 flash
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                }
+            //🔥 呼叫 Groq API，開啟 json_object 模式確保格式正確
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    {
+                        role: "system",
+                        content: "你是一個專業的物理運算 AI，請嚴格輸出 JSON 格式的數據。"
+                    },
+                    {
+                        role: "user",
+                        content: prompt
+                    }
+                ],
+                model: "llama-3.3-70b-versatile",
+                response_format: { type: "json_object" },
+                temperature: 0.1
             });
 
             //🔥 思考完畢，準備回傳動作
             socket.emit('aiStatus', '計算完成！準備出桿...');
 
-            const move = JSON.parse(response.text);
+            const move = JSON.parse(chatCompletion.choices[0].message.content);
             socket.emit('aiMove', move);
         } catch (error) {
             console.error("AI 錯誤，採用隨機打擊:", error);
