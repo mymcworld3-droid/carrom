@@ -11,8 +11,7 @@
         #ui h3 { margin: 0 0 10px 0; color: #f1c40f; }
         #ui p { margin: 5px 0; font-size: 14px; color: #bdc3c7; }
         
-        /*🔥 新增回合提示文字樣式 */
-        #turn-indicator { font-size: 18px; font-weight: bold; margin-bottom: 15px !important; color: #2ecc71; /* 預設玩家1顏色 */ }
+        #turn-indicator { font-size: 18px; font-weight: bold; margin-bottom: 15px !important; color: #2ecc71; }
 
         /* 右側計分板樣式 */
         #scoreboard { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
@@ -27,7 +26,7 @@
 <body>
     <div id="ui">
         <h3>克朗棋 (單機對戰版)</h3>
-        <p id="turn-indicator">現在輪到：玩家 1 (下方)</p>
+        <p id="turn-indicator">現在輪到：玩家 1 (下方，黑棋)</p>
         <p>拖曳擊打紅色打擊子 (Striker)</p>
         <p>點擊底線空白處可平移紅球</p>
     </div>
