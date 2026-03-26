@@ -140,6 +140,11 @@ for (let i = 0; i < 12; i++) {
 Composite.add(engine.world, [...walls, ...pockets, striker, ...pucks]);
 
 // 5. 處理進洞邏輯 (偵測碰撞)
+
+//🔥 宣告黑白棋剩餘數量
+let blackCount = 9;
+let whiteCount = 9;
+
 Events.on(engine, 'collisionStart', (event) => {
     const pairs = event.pairs;
     for (let i = 0; i < pairs.length; i++) {
@@ -151,6 +156,17 @@ Events.on(engine, 'collisionStart', (event) => {
 
         if (pocket && piece) {
             if (piece.label === 'puck') {
+                //🔥 檢查是否為首次進洞 (確保不會因重複碰撞而多扣分)
+                if (piece.position.x !== -100) {
+                    if (piece.render.fillStyle === colorBlack) {
+                        blackCount--;
+                        document.getElementById('black-count').innerText = `x ${blackCount}`;
+                    } else if (piece.render.fillStyle === colorWhite) {
+                        whiteCount--;
+                        document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                    }
+                }
+
                 // 棋子進洞，移出畫面並停止運動
                 Body.setPosition(piece, { x: -100, y: -100 });
                 Body.setVelocity(piece, { x: 0, y: 0 });
