@@ -29,7 +29,8 @@ const runner = Runner.create();
 Runner.run(runner, engine);
 
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
-const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6 };
+//🔥 將牆壁的接觸摩擦力 friction 設為 0，確保碰撞反彈不掉速
+const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 };
 
 //🔥 加厚牆壁厚度到 100px 並向外偏移。畫面上看起來一樣是 20px 的邊框，但物理上是一堵厚牆，徹底防止高速穿透
 const walls = [
@@ -55,8 +56,9 @@ const pockets = [
 const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, { 
     label: 'striker',
     restitution: 0.6, 
-    frictionAir: 0.02, 
-    mass: 15, //🔥 明確設定打擊子的質量為 15 (通常為棋子的 3 倍重)，撞擊會更有真實感與穿透力
+    frictionAir: 0.008, //🔥 降低表面滑行阻力 (原本 0.02)
+    friction: 0.01,     //🔥 降低接觸摩擦力
+    mass: 15,
     render: { fillStyle: '#ff4757', strokeStyle: '#fff', lineWidth: 2 } 
 });
 
@@ -76,8 +78,9 @@ const colorBlack = '#2f3542'; // 黑棋
 const puckOptions = {
     label: 'puck',
     restitution: 0.8, 
-    frictionAir: 0.015,
-    mass: 5 //🔥 明確設定普通棋子與皇后的質量為 5
+    frictionAir: 0.004, //🔥 大幅降低棋子的表面滑行阻力 (原本 0.015)，讓炸球效果更明顯
+    friction: 0.01,     //🔥 降低接觸摩擦力
+    mass: 5
 };
 
 // 1. 中心皇后 (1顆)
