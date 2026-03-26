@@ -3,7 +3,7 @@ const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events } = Matt
 const WIDTH = 600;
 const HEIGHT = 600;
 
-//🔥 初始化音效
+// 初始化音效
 const potSound = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_13334d7003.mp3');
 
 // 1. 初始化物理引擎
@@ -45,8 +45,8 @@ const walls = [
 
 // 建立四個角落的球洞
 const pocketRadius = 30;
-//🔥 給球洞加一點內部陰影效果， label 用來辨識球洞
-//🔥 這裡將球洞標記為 Sensor，不進行實體碰撞，我們將在下面手動判定嚴格進洞
+// 給球洞加一點內部陰影效果， label 用來辨識球洞
+// 這裡將球洞標記為 Sensor，不進行實體碰撞，我們將在下面手動判定嚴格進洞
 const pocketOptions = { isStatic: true, isSensor: true, label: 'pocket', render: { fillStyle: '#1a1a1a' } };
 const pockets = [
     Bodies.circle(30, 30, pocketRadius, pocketOptions),
@@ -143,39 +143,42 @@ for (let i = 0; i < 12; i++) {
 // 將球洞、棋子加入物理世界
 Composite.add(engine.world, [...walls, ...pockets, striker, ...pucks]);
 
-//🔥 宣告黑白棋剩餘數量與特效狀態
+// 宣告黑白棋剩餘數量與特效狀態
 let blackCount = 9;
 let whiteCount = 9;
-let potEffects = []; //🔥 用於儲存進洞特效的狀態 (光圈與棋子縮小)
+let potEffects = []; // 用於儲存進洞特效的狀態 (光圈與棋子縮小)
 
-// 🔥 5. 處理嚴格進洞邏輯 (由 collisionStart 改為在 afterUpdate 中手動計算距離)
+//🔥 定義當前玩家 (1 為下方，2 為上方)
+let currentPlayer = 1;
+
+// 5. 處理嚴格進洞邏輯 (由 collisionStart 改為在 afterUpdate 中手動計算距離)
 Events.on(engine, 'afterUpdate', () => {
-    //🔥 檢查所有棋子 (Pucks)
+    // 檢查所有棋子 (Pucks)
     pucks.forEach(piece => {
         // 只有還在棋盤上的棋子才需要檢查
         if (piece.position.x === -100) return;
 
         pockets.forEach(pocket => {
-            //🔥 計算棋子與球洞中心點的距離
+            // 計算棋子與球洞中心點的距離
             const dist = Vector.magnitude(Vector.sub(piece.position, pocket.position));
             
-            //🔥 嚴格進洞判定：棋子中心點必須進入球洞半徑內 (這裡設定小於 25px)
+            // 嚴格進洞判定：棋子中心點必須進入球洞半徑內 (這裡設定小於 25px)
             if (dist < 25) {
-                //🔥 進洞特效：新增一個特效狀態到陣列中
+                // 進洞特效：新增一個特效狀態到陣列中
                 potEffects.push({
                     x: pocket.position.x,
                     y: pocket.position.y,
-                    r: 10,        //🔥 初始光圈半徑
-                    color: '#f1c40f', //🔥 進球光圈顏色 (金色)
-                    life: 30,     //🔥 特效生命週期 (影格數)
-                    type: 'piece', //🔥 特效類型
-                    //🔥 儲存棋子消失前的最後狀態
+                    r: 10,        // 初始光圈半徑
+                    color: '#f1c40f', // 進球光圈顏色 (金色)
+                    life: 30,     // 特效生命週期 (影格數)
+                    type: 'piece', // 特效類型
+                    // 儲存棋子消失前的最後狀態
                     piecePos: { x: piece.position.x, y: piece.position.y },
                     pieceRad: piece.circleRadius,
                     pieceColor: piece.render.fillStyle
                 });
 
-                //🔥 進洞扣除數量邏輯
+                // 進洞扣除數量邏輯
                 if (piece.render.fillStyle === colorBlack) {
                     blackCount--;
                     document.getElementById('black-count').innerText = `x ${blackCount}`;
@@ -184,7 +187,7 @@ Events.on(engine, 'afterUpdate', () => {
                     document.getElementById('white-count').innerText = `x ${whiteCount}`;
                 }
 
-                //🔥 播放進洞音效
+                // 播放進洞音效
                 potSound.play();
 
                 // 棋子進洞，移出畫面並停止運動
@@ -194,32 +197,33 @@ Events.on(engine, 'afterUpdate', () => {
         });
     });
 
-    //🔥 檢查打擊子 (Striker)
+    // 檢查打擊子 (Striker)
     pockets.forEach(pocket => {
-        //🔥 計算打擊子與球洞中心點的距離
+        // 計算打擊子與球洞中心點的距離
         const distS = Vector.magnitude(Vector.sub(striker.position, pocket.position));
         
-        //🔥 打擊子進洞嚴格判定 (中心點進入距離小於 25px)
+        // 打擊子進洞嚴格判定 (中心點進入距離小於 25px)
         if (distS < 25 && !isPlacing) { // 擺放模式下不判定進洞
-             //🔥 進洞特效：新增一個特效狀態到陣列中
+             // 進洞特效：新增一個特效狀態到陣列中
              potEffects.push({
                 x: pocket.position.x,
                 y: pocket.position.y,
-                r: 10,        //🔥 初始光圈半徑
-                color: '#c0392b', //🔥 進球光圈顏色 (深紅)
-                life: 30,     //🔥 特效生命週期 (影格數)
-                type: 'striker', //🔥 特效類型
-                //🔥 儲存棋子消失前的最後狀態
+                r: 10,        // 初始光圈半徑
+                color: '#c0392b', // 進球光圈顏色 (深紅)
+                life: 30,     // 特效生命週期 (影格數)
+                type: 'striker', // 特效類型
+                // 儲存棋子消失前的最後狀態
                 piecePos: { x: striker.position.x, y: striker.position.y },
                 pieceRad: striker.circleRadius,
                 pieceColor: striker.render.fillStyle
             });
 
-            //🔥 播放進洞音效
+            // 播放進洞音效
             potSound.play();
 
-            // 打擊子進洞，懲罰性重置到發球線
-            Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
+            //🔥 判斷當前玩家的基準線 Y 座標 (犯規重置仍在當前玩家這邊)
+            const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
+            Body.setPosition(striker, { x: WIDTH/2, y: resetY });
             Body.setVelocity(striker, { x: 0, y: 0 });
         }
     });
@@ -250,8 +254,11 @@ window.addEventListener('pointermove', (e) => {
         if (newX < minX) newX = minX;
         if (newX > maxX) newX = maxX;
 
-        // 強制設定位置與清除速度 (鎖定 Y 軸在發球線上)
-        Body.setPosition(striker, { x: newX, y: HEIGHT * 0.8 });
+        //🔥 根據當前玩家，決定鎖定在下方 (0.8) 還是上方 (0.2) 的基準線
+        const lockY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
+        
+        // 強制設定位置與清除速度
+        Body.setPosition(striker, { x: newX, y: lockY });
         Body.setVelocity(striker, { x: 0, y: 0 });
     }
 });
@@ -317,7 +324,7 @@ window.addEventListener('pointerup', (e) => {
     }, 50);
 });
 
-// 7. 檢查是否所有棋子都靜止
+// 7. 檢查是否所有棋子都靜止，並處理回合切換
 Events.on(engine, 'afterUpdate', () => {
     let anyMoving = false;
     // 檢查速度是否大於微小值
@@ -328,12 +335,26 @@ Events.on(engine, 'afterUpdate', () => {
 
     isMoving = anyMoving;
 
-    // 如果所有球都已經靜止，且是擊球後的回合，則重置紅球位置
+    //🔥 如果所有球都已經靜止，且是剛擊球後的回合
     if (!isMoving && turnActive) {
         turnActive = false; // 結束這回合的追蹤狀態
         
-        // 把紅球強制放回發球區中心
-        Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
+        //🔥 切換玩家 (1 換 2，2 換 1)
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        
+        //🔥 更新 UI 顯示
+        const turnIndicator = document.getElementById('turn-indicator');
+        if (currentPlayer === 1) {
+            turnIndicator.innerText = "現在輪到：玩家 1 (下方)";
+            turnIndicator.style.color = "#2ecc71"; // 綠色
+        } else {
+            turnIndicator.innerText = "現在輪到：玩家 2 (上方)";
+            turnIndicator.style.color = "#e74c3c"; // 紅色
+        }
+
+        //🔥 根據切換後的新玩家，將紅球強制放回對應發球區中心
+        const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
+        Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
     }
 });
@@ -363,18 +384,26 @@ Events.on(render, 'afterRender', () => {
     ctx.fill();
     ctx.restore();
 
-    // 2. 繪製底部的發球線區域 (在花紋上面，但在棋子底下)
+    //🔥 2. 繪製下方與上方的發球線區域 (基準線)
     ctx.beginPath();
-    // 畫咖啡色細線
+    // 畫下方咖啡色細線 (玩家 1)
     ctx.moveTo(100, HEIGHT * 0.8);
     ctx.lineTo(WIDTH - 100, HEIGHT * 0.8);
+    // 畫上方咖啡色細線 (玩家 2)
+    ctx.moveTo(100, HEIGHT * 0.2);
+    ctx.lineTo(WIDTH - 100, HEIGHT * 0.2);
     ctx.strokeStyle = 'rgba(62, 39, 35, 0.6)'; // 半透明深咖啡色
     ctx.lineWidth = 2;
     ctx.stroke();
+
     // 畫深咖啡色細線兩端的小圓
     ctx.beginPath();
+    // 下方兩端
     ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
     ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
+    // 上方兩端
+    ctx.arc(100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
+    ctx.arc(WIDTH - 100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
     ctx.fillStyle = '#3e2723'; // 深咖啡色
     ctx.fill();
 
@@ -449,13 +478,13 @@ Events.on(render, 'afterRender', () => {
         ctx.setLineDash([]);
     }
 
-    // 🔥 5. 繪製與更新進洞特效 (光圈與棋子縮小)
+    // 5. 繪製與更新進洞特效 (光圈與棋子縮小)
     for (let i = potEffects.length - 1; i >= 0; i--) {
         const effect = potEffects[i];
         
         ctx.save();
-        //🔥 特效 1：擴散的光圈
-        const alpha = effect.life / 30; //🔥 根據生命週期計算透明度
+        // 特效 1：擴散的光圈
+        const alpha = effect.life / 30; // 根據生命週期計算透明度
         ctx.globalAlpha = alpha;
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.r, 0, 2 * Math.PI);
@@ -463,11 +492,11 @@ Events.on(render, 'afterRender', () => {
         ctx.lineWidth = 4;
         ctx.stroke();
 
-        //🔥 特效 2：棋子消失前的縮小視覺
-        //🔥 只有生命週期大於 0 時才繪製 (模擬掉進洞裡)
+        // 特效 2：棋子消失前的縮小視覺
+        // 只有生命週期大於 0 時才繪製 (模擬掉進洞裡)
         if (alpha > 0) {
             ctx.globalAlpha = alpha * 0.8;
-            const scaledRad = effect.pieceRad * alpha; //🔥 快速縮小半徑
+            const scaledRad = effect.pieceRad * alpha; // 快速縮小半徑
             ctx.beginPath();
             ctx.arc(effect.piecePos.x, effect.piecePos.y, scaledRad, 0, 2 * Math.PI);
             ctx.fillStyle = effect.pieceColor;
@@ -475,11 +504,11 @@ Events.on(render, 'afterRender', () => {
         }
         ctx.restore();
 
-        //🔥 更新特效狀態
-        effect.r += 2; //🔥 光圈擴散
-        effect.life--; //🔥 生命週期減少
+        // 更新特效狀態
+        effect.r += 2; // 光圈擴散
+        effect.life--; // 生命週期減少
 
-        //🔥 特效結束後移除
+        // 特效結束後移除
         if (effect.life <= 0) {
             potEffects.splice(i, 1);
         }
