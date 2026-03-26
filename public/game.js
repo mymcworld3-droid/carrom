@@ -105,19 +105,19 @@ Events.on(engine, 'collisionStart', (event) => {
 let isDragging = false;
 let startPoint = null;
 let mousePos = { x: 0, y: 0 };
-let isMoving = false; //🔥 防止移動中重複擊打
-let hasStruck = false; //🔥 標記是否剛由自己完成擊球，用來判定同步權限
+let isMoving = false; // 防止移動中重複擊打
+let hasStruck = false; // 標記是否剛由自己完成擊球，用來判定同步權限
 
-// 監聽滑鼠移動以繪製拉力線 (僅視覺)
-window.addEventListener('mousemove', (e) => {
+//🔥 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
+window.addEventListener('pointermove', (e) => {
     const rect = render.canvas.getBoundingClientRect();
     mousePos.x = e.clientX - rect.left;
     mousePos.y = e.clientY - rect.top;
 });
 
-// 滑鼠按下：檢查是否點擊在打擊子上
-window.addEventListener('mousedown', (e) => {
-    if (isMoving) return; //🔥 棋子移動中不允許拖曳
+//🔥 指標按下：檢查是否點擊在打擊子上
+window.addEventListener('pointerdown', (e) => {
+    if (isMoving) return; // 棋子移動中不允許拖曳
 
     const rect = render.canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -131,8 +131,8 @@ window.addEventListener('mousedown', (e) => {
     }
 });
 
-// 滑鼠放開：施加力量並傳送給對手
-window.addEventListener('mouseup', (e) => {
+//🔥 指標放開：施加力量並傳送給對手
+window.addEventListener('pointerup', (e) => {
     if (!isDragging) return;
     isDragging = false;
 
@@ -150,13 +150,13 @@ window.addEventListener('mouseup', (e) => {
     // 應用物理力到 striker
     Body.applyForce(striker, striker.position, forceVector);
 
-    // 🔥 傳送擊球數據到伺服器
+    // 傳送擊球數據到伺服器
     socket.emit('strike', {
         force: forceVector,
         position: striker.position // 傳送當前位置以進行粗略同步
     });
 
-    //🔥 延遲一點點再標記已擊球，確保物理引擎已經賦予速度
+    // 延遲一點點再標記已擊球，確保物理引擎已經賦予速度
     setTimeout(() => {
         hasStruck = true;
     }, 50);
