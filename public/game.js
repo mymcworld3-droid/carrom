@@ -151,10 +151,11 @@ let potEffects = []; // 用於儲存進洞特效的狀態 (光圈與棋子縮小
 // 定義當前玩家 (1 為下方/打黑棋，2 為上方/打白棋)
 let currentPlayer = 1;
 
-//🔥 宣告這回合的擊球結算狀態變數
+// 宣告這回合的擊球結算狀態變數
 let pottedOwnPieceThisTurn = false;
 let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
+let piecesPottedThisTurn = []; //🔥 記錄這回合被打進的所有棋子 (為了犯規時能吐出來)
 
 // 5. 處理嚴格進洞邏輯 (由 collisionStart 改為在 afterUpdate 中手動計算距離)
 Events.on(engine, 'afterUpdate', () => {
@@ -169,6 +170,9 @@ Events.on(engine, 'afterUpdate', () => {
             
             // 嚴格進洞判定：棋子中心點必須進入球洞半徑內 (這裡設定小於 25px)
             if (dist < 25) {
+                //🔥 記錄這回合進洞的棋子
+                piecesPottedThisTurn.push(piece);
+
                 // 進洞特效：新增一個特效狀態到陣列中
                 potEffects.push({
                     x: pocket.position.x,
@@ -183,23 +187,23 @@ Events.on(engine, 'afterUpdate', () => {
                     pieceColor: piece.render.fillStyle
                 });
 
-                //🔥 進洞扣除數量邏輯與連擊條件判斷
+                // 進洞扣除數量邏輯與連擊條件判斷
                 if (piece.render.fillStyle === colorBlack) {
                     blackCount--;
                     document.getElementById('black-count').innerText = `x ${blackCount}`;
-                    if (currentPlayer === 1) pottedOwnPieceThisTurn = true; //🔥 玩家1打進黑棋，標記進自己球
+                    if (currentPlayer === 1) pottedOwnPieceThisTurn = true; 
                 } else if (piece.render.fillStyle === colorWhite) {
                     whiteCount--;
                     document.getElementById('white-count').innerText = `x ${whiteCount}`;
-                    if (currentPlayer === 2) pottedOwnPieceThisTurn = true; //🔥 玩家2打進白棋，標記進自己球
+                    if (currentPlayer === 2) pottedOwnPieceThisTurn = true; 
                 } else if (piece.render.fillStyle === colorQueen) {
-                    pottedQueenThisTurn = true; //🔥 標記皇后進洞
+                    pottedQueenThisTurn = true; // 標記皇后進洞
                 }
 
                 // 播放進洞音效
                 potSound.play();
 
-                // 棋子進洞，移出畫面並停止運動
+                // 棋子進洞，暫時移出畫面並停止運動
                 Body.setPosition(piece, { x: -100, y: -100 });
                 Body.setVelocity(piece, { x: 0, y: 0 });
             }
@@ -230,7 +234,7 @@ Events.on(engine, 'afterUpdate', () => {
             // 播放進洞音效
             potSound.play();
             
-            pottedStrikerThisTurn = true; //🔥 標記母球洗澡(犯規)
+            pottedStrikerThisTurn = true; // 標記母球洗澡(犯規)
 
             // 判斷當前玩家的基準線 Y 座標 (犯規重置仍在當前玩家這邊)
             const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
@@ -350,8 +354,62 @@ Events.on(engine, 'afterUpdate', () => {
     if (!isMoving && turnActive) {
         turnActive = false; // 結束這回合的追蹤狀態
         
-        //🔥 判斷是否可以繼續擊球：進了自己的球 且 沒洗澡 且 沒進皇后
-        const keepTurn = pottedOwnPieceThisTurn && !pottedStrikerThisTurn && !pottedQueenThisTurn;
+        //🔥 檢查是否觸發「過早打進皇后」的犯規 (己方球大於0且打進Queen)
+        let isFoulQueen = false;
+        if (pottedQueenThisTurn) {
+            const ownRemaining = currentPlayer === 1 ? blackCount : whiteCount;
+            if (ownRemaining > 0) {
+                isFoulQueen = true;
+            }
+        }
+
+        //🔥 如果觸發皇后犯規：本回合進球全部吐出來，並加罰一顆
+        if (isFoulQueen) {
+            // 1. 本回合進洞的球全部回到中間
+            piecesPottedThisTurn.forEach(p => {
+                // 在中心點附近給一點隨機偏移，避免棋子完美重疊而彈飛
+                const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
+                const ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
+                Body.setPosition(p, { x: rx, y: ry });
+                Body.setVelocity(p, { x: 0, y: 0 });
+
+                // 恢復計分板數量
+                if (p.render.fillStyle === colorBlack) {
+                    blackCount++;
+                    document.getElementById('black-count').innerText = `x ${blackCount}`;
+                } else if (p.render.fillStyle === colorWhite) {
+                    whiteCount++;
+                    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                }
+            });
+
+            // 2. 額外加罰己方一顆球 (從已經進洞的球裡找一顆放回中間)
+            const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
+            // 尋找顏色相符、目前在場外(-100)、且不是這回合剛被打進的球
+            const penaltyPiece = pucks.find(p => p.render.fillStyle === myColor && p.position.x === -100 && !piecesPottedThisTurn.includes(p));
+            
+            if (penaltyPiece) {
+                const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
+                const ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
+                Body.setPosition(penaltyPiece, { x: rx, y: ry });
+                Body.setVelocity(penaltyPiece, { x: 0, y: 0 });
+                
+                // 恢復罰球的計分板數量
+                if (myColor === colorBlack) {
+                    blackCount++;
+                    document.getElementById('black-count').innerText = `x ${blackCount}`;
+                } else {
+                    whiteCount++;
+                    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                }
+            }
+
+            // 犯規會喪失繼續擊球的權力
+            pottedOwnPieceThisTurn = false; 
+        }
+
+        // 判斷是否可以繼續擊球：進了自己的球 且 沒洗澡 且 沒犯規打進皇后
+        const keepTurn = pottedOwnPieceThisTurn && !pottedStrikerThisTurn && !isFoulQueen;
 
         if (!keepTurn) {
             // 切換玩家 (1 換 2，2 換 1)
@@ -362,6 +420,7 @@ Events.on(engine, 'afterUpdate', () => {
         pottedOwnPieceThisTurn = false;
         pottedStrikerThisTurn = false;
         pottedQueenThisTurn = false;
+        piecesPottedThisTurn = []; //🔥 清空本回合進洞紀錄
         
         // 更新 UI 顯示
         const turnIndicator = document.getElementById('turn-indicator');
