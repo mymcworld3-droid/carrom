@@ -28,7 +28,6 @@ Render.run(render);
 const runner = Runner.create();
 Runner.run(runner, engine);
 
-JavaScript
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
 const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6 };
 
