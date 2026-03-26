@@ -80,7 +80,7 @@ io.on('connection', (socket) => {
             - 黑棋座標 (障礙物)：${JSON.stringify(gameState.blackPucks)}
             - 皇后座標：${JSON.stringify(gameState.queen)}
 
-            請運用幾何反射角與質量推算，找出最安全的進球路徑。
+            請運用幾何反射角與質量推算，找出最安全的進球路徑。請以最快的速度回傳，越快越好。
             嚴格只回傳 JSON 格式如下，不要包含 Markdown 標籤(\`\`\`json)或其他任何文字：
             {"strikerX": 300, "forceX": 0.05, "forceY": 0.5}
             `;
