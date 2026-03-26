@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>克朗棋 (單機精緻版 V2)</title>
+    <title>克朗棋 (單機對戰版)</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; display: flex; justify-content: center; align-items: center; height: 100vh; color: #ecf0f1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
         canvas { box-shadow: 0 15px 30px rgba(0,0,0,0.6); border-radius: 8px; }
@@ -11,7 +11,10 @@
         #ui h3 { margin: 0 0 10px 0; color: #f1c40f; }
         #ui p { margin: 5px 0; font-size: 14px; color: #bdc3c7; }
         
-        /*🔥 右側計分板樣式，完美模擬實體棋子的凹槽與高光 */
+        /*🔥 新增回合提示文字樣式 */
+        #turn-indicator { font-size: 18px; font-weight: bold; margin-bottom: 15px !important; color: #2ecc71; /* 預設玩家1顏色 */ }
+
+        /* 右側計分板樣式 */
         #scoreboard { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
         .score-item { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: bold; }
         .piece-icon { width: 24px; height: 24px; border-radius: 50%; position: relative; }
@@ -23,9 +26,10 @@
 </head>
 <body>
     <div id="ui">
-        <h3>克朗棋 (單機精緻版 V2)</h3>
+        <h3>克朗棋 (單機對戰版)</h3>
+        <p id="turn-indicator">現在輪到：玩家 1 (下方)</p>
         <p>拖曳擊打紅色打擊子 (Striker)</p>
-        <p>單人練習模式</p>
+        <p>點擊底線空白處可平移紅球</p>
     </div>
 
     <div id="scoreboard">
