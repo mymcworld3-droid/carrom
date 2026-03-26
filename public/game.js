@@ -1,5 +1,7 @@
 const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events } = Matter;
 
+const socket = io(); //🔥 初始化與伺服器的連線
+
 const WIDTH = 600;
 const HEIGHT = 600;
 
@@ -155,7 +157,7 @@ let currentPlayer = 1;
 let pottedOwnPieceThisTurn = false;
 let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
-let piecesPottedThisTurn = []; //🔥 記錄這回合被打進的所有棋子 (為了犯規時能吐出來)
+let piecesPottedThisTurn = []; // 記錄這回合被打進的所有棋子 (為了犯規時能吐出來)
 
 // 5. 處理嚴格進洞邏輯 (由 collisionStart 改為在 afterUpdate 中手動計算距離)
 Events.on(engine, 'afterUpdate', () => {
@@ -170,7 +172,7 @@ Events.on(engine, 'afterUpdate', () => {
             
             // 嚴格進洞判定：棋子中心點必須進入球洞半徑內 (這裡設定小於 25px)
             if (dist < 25) {
-                //🔥 記錄這回合進洞的棋子
+                // 記錄這回合進洞的棋子
                 piecesPottedThisTurn.push(piece);
 
                 // 進洞特效：新增一個特效狀態到陣列中
@@ -255,6 +257,7 @@ let isPlacing = false; // 判斷是否正在平行移動紅球
 
 // 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
 window.addEventListener('pointermove', (e) => {
+    if (currentPlayer === 2) return; //🔥 阻止玩家在 AI 回合操作
     const rect = render.canvas.getBoundingClientRect();
     mousePos.x = e.clientX - rect.left;
     mousePos.y = e.clientY - rect.top;
@@ -280,6 +283,7 @@ window.addEventListener('pointermove', (e) => {
 
 // 指標按下：檢查是否點擊在打擊子上
 window.addEventListener('pointerdown', (e) => {
+    if (currentPlayer === 2) return; //🔥 阻止玩家在 AI 回合操作
     if (isMoving) return; // 棋子移動中不允許拖曳或擺放
 
     const rect = render.canvas.getBoundingClientRect();
@@ -301,6 +305,7 @@ window.addEventListener('pointerdown', (e) => {
 
 // 指標放開：施加力量或結束擺放
 window.addEventListener('pointerup', (e) => {
+    if (currentPlayer === 2) return; //🔥 阻止玩家在 AI 回合操作
     // 如果是擺放模式，結束擺放並恢復物理碰撞
     if (isPlacing) {
         isPlacing = false;
@@ -354,7 +359,7 @@ Events.on(engine, 'afterUpdate', () => {
     if (!isMoving && turnActive) {
         turnActive = false; // 結束這回合的追蹤狀態
         
-        //🔥 檢查是否觸發「過早打進皇后」的犯規 (己方球大於0且打進Queen)
+        // 檢查是否觸發「過早打進皇后」的犯規 (己方球大於0且打進Queen)
         let isFoulQueen = false;
         if (pottedQueenThisTurn) {
             const ownRemaining = currentPlayer === 1 ? blackCount : whiteCount;
@@ -363,7 +368,7 @@ Events.on(engine, 'afterUpdate', () => {
             }
         }
 
-        //🔥 如果觸發皇后犯規：本回合進球全部吐出來，並加罰一顆
+        // 如果觸發皇后犯規：本回合進球全部吐出來，並加罰一顆
         if (isFoulQueen) {
             // 1. 本回合進洞的球全部回到中間
             piecesPottedThisTurn.forEach(p => {
@@ -416,11 +421,11 @@ Events.on(engine, 'afterUpdate', () => {
             currentPlayer = currentPlayer === 1 ? 2 : 1;
         }
 
-        //🔥 重置這回合的狀態標記，為下一回合做準備
+        // 重置這回合的狀態標記，為下一回合做準備
         pottedOwnPieceThisTurn = false;
         pottedStrikerThisTurn = false;
         pottedQueenThisTurn = false;
-        piecesPottedThisTurn = []; //🔥 清空本回合進洞紀錄
+        piecesPottedThisTurn = []; // 清空本回合進洞紀錄
         
         // 更新 UI 顯示
         const turnIndicator = document.getElementById('turn-indicator');
@@ -436,6 +441,11 @@ Events.on(engine, 'afterUpdate', () => {
         const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
+
+        //🔥 如果輪到 AI (Player 2)，則向伺服器請求打擊指令
+        if (currentPlayer === 2) {
+            requestAIAction();
+        }
     }
 });
 
@@ -605,4 +615,51 @@ Events.on(render, 'afterRender', () => {
             potEffects.splice(i, 1);
         }
     }
+});
+
+//🔥 === 新增 AI 專屬邏輯區塊 ===
+
+// 收集並發送盤面資料給 Gemini
+function requestAIAction() {
+    // 過濾出還在檯面上的棋子，並四捨五入座標節省傳輸大小
+    const whitePucks = pucks
+        .filter(p => p.render.fillStyle === colorWhite && p.position.x !== -100)
+        .map(p => ({ x: Math.round(p.position.x), y: Math.round(p.position.y) }));
+    const blackPucks = pucks
+        .filter(p => p.render.fillStyle === colorBlack && p.position.x !== -100)
+        .map(p => ({ x: Math.round(p.position.x), y: Math.round(p.position.y) }));
+    const queenPuck = pucks.find(p => p.render.fillStyle === colorQueen && p.position.x !== -100);
+
+    const gameState = {
+        whitePucks,
+        blackPucks,
+        queen: queenPuck ? { x: Math.round(queenPuck.position.x), y: Math.round(queenPuck.position.y) } : null
+    };
+
+    socket.emit('requestAIMove', gameState);
+}
+
+// 接收來自伺服器的 AI 打擊指令並執行
+socket.on('aiMove', (move) => {
+    if (currentPlayer !== 2) return; // 雙重檢查，確保是 AI 回合
+
+    // 安全防護機制：確保 AI 給出的數值沒有超出物理與規則邊界
+    const safeX = Math.max(120, Math.min(480, move.strikerX || 300));
+    let safeForceX = Math.max(-0.8, Math.min(0.8, move.forceX || 0));
+    let safeForceY = Math.max(0, Math.min(0.8, move.forceY || 0.4)); // 必須往下打 (>0)
+
+    // 1. 移動打擊子到 AI 決定的 X 座標
+    Body.setPosition(striker, { x: safeX, y: HEIGHT * 0.2 });
+    Body.setVelocity(striker, { x: 0, y: 0 });
+
+    // 2. 刻意延遲 1 秒再擊打，讓人類玩家能看清楚 AI 把球擺在哪裡
+    setTimeout(() => {
+        const forceVector = { x: safeForceX, y: safeForceY };
+        Body.applyForce(striker, striker.position, forceVector);
+        
+        // 延遲一點點標記回合啟動
+        setTimeout(() => {
+            turnActive = true;
+        }, 50);
+    }, 1000);
 });
