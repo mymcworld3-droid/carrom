@@ -3,6 +3,9 @@ const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events } = Matt
 const WIDTH = 600;
 const HEIGHT = 600;
 
+//🔥 初始化音效
+const potSound = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_13334d7003.mp3');
+
 // 1. 初始化物理引擎
 const engine = Engine.create({
     positionIterations: 10, // 提高精確度，防止高速穿透
@@ -42,7 +45,8 @@ const walls = [
 
 // 建立四個角落的球洞
 const pocketRadius = 30;
-// 給球洞加一點內部陰影效果， label 用來辨識球洞
+//🔥 給球洞加一點內部陰影效果， label 用來辨識球洞
+//🔥 這裡將球洞標記為 Sensor，不進行實體碰撞，我們將在下面手動判定嚴格進洞
 const pocketOptions = { isStatic: true, isSensor: true, label: 'pocket', render: { fillStyle: '#1a1a1a' } };
 const pockets = [
     Bodies.circle(30, 30, pocketRadius, pocketOptions),
@@ -67,7 +71,7 @@ const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, {
     friction: 0.01,     // 降低接觸摩擦力
     mass: 15, // 打擊子質量為棋子的 3 倍
     render: { 
-        visible: false, //🔥 關閉引擎預設渲染，我們將在下面手動繪製，確保圖層完全正確
+        visible: false, // 關閉引擎預設渲染，我們將在下面手動繪製，確保圖層完全正確
         fillStyle: colorStriker, 
         strokeStyle: '#f39c12', // 金色細邊框
         lineWidth: 3
@@ -95,7 +99,7 @@ const puckOptions = {
 pucks.push(Bodies.circle(cx, cy, puckRadius, { 
     ...puckOptions, 
     id: puckId++, 
-    render: { visible: false, fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 } //🔥 關閉預設渲染
+    render: { visible: false, fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 } // 關閉預設渲染
 }));
 
 // 2. 內圈 (6顆，交替顏色)
@@ -107,7 +111,7 @@ for (let i = 0; i < 6; i++) {
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
-        render: { visible: false, fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } //🔥 關閉預設渲染
+        render: { visible: false, fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } // 關閉預設渲染
     }));
 }
 
@@ -132,51 +136,93 @@ for (let i = 0; i < 12; i++) {
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
-        render: { visible: false, fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } //🔥 關閉預設渲染
+        render: { visible: false, fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } // 關閉預設渲染
     }));
 }
 
 // 將球洞、棋子加入物理世界
 Composite.add(engine.world, [...walls, ...pockets, striker, ...pucks]);
 
-// 5. 處理進洞邏輯 (偵測碰撞)
-
-//🔥 宣告黑白棋剩餘數量
+//🔥 宣告黑白棋剩餘數量與特效狀態
 let blackCount = 9;
 let whiteCount = 9;
+let potEffects = []; //🔥 用於儲存進洞特效的狀態 (光圈與棋子縮小)
 
-Events.on(engine, 'collisionStart', (event) => {
-    const pairs = event.pairs;
-    for (let i = 0; i < pairs.length; i++) {
-        const bodyA = pairs[i].bodyA;
-        const bodyB = pairs[i].bodyB;
+// 🔥 5. 處理嚴格進洞邏輯 (由 collisionStart 改為在 afterUpdate 中手動計算距離)
+Events.on(engine, 'afterUpdate', () => {
+    //🔥 檢查所有棋子 (Pucks)
+    pucks.forEach(piece => {
+        // 只有還在棋盤上的棋子才需要檢查
+        if (piece.position.x === -100) return;
 
-        const pocket = (bodyA.label === 'pocket') ? bodyA : ((bodyB.label === 'pocket') ? bodyB : null);
-        const piece = (bodyA.label === 'pocket') ? bodyB : ((bodyB.label === 'pocket') ? bodyA : null);
+        pockets.forEach(pocket => {
+            //🔥 計算棋子與球洞中心點的距離
+            const dist = Vector.magnitude(Vector.sub(piece.position, pocket.position));
+            
+            //🔥 嚴格進洞判定：棋子中心點必須進入球洞半徑內 (這裡設定小於 25px)
+            if (dist < 25) {
+                //🔥 進洞特效：新增一個特效狀態到陣列中
+                potEffects.push({
+                    x: pocket.position.x,
+                    y: pocket.position.y,
+                    r: 10,        //🔥 初始光圈半徑
+                    color: '#f1c40f', //🔥 進球光圈顏色 (金色)
+                    life: 30,     //🔥 特效生命週期 (影格數)
+                    type: 'piece', //🔥 特效類型
+                    //🔥 儲存棋子消失前的最後狀態
+                    piecePos: { x: piece.position.x, y: piece.position.y },
+                    pieceRad: piece.circleRadius,
+                    pieceColor: piece.render.fillStyle
+                });
 
-        if (pocket && piece) {
-            if (piece.label === 'puck') {
-                //🔥 檢查是否為首次進洞 (確保不會因重複碰撞而多扣分)
-                if (piece.position.x !== -100) {
-                    if (piece.render.fillStyle === colorBlack) {
-                        blackCount--;
-                        document.getElementById('black-count').innerText = `x ${blackCount}`;
-                    } else if (piece.render.fillStyle === colorWhite) {
-                        whiteCount--;
-                        document.getElementById('white-count').innerText = `x ${whiteCount}`;
-                    }
+                //🔥 進洞扣除數量邏輯
+                if (piece.render.fillStyle === colorBlack) {
+                    blackCount--;
+                    document.getElementById('black-count').innerText = `x ${blackCount}`;
+                } else if (piece.render.fillStyle === colorWhite) {
+                    whiteCount--;
+                    document.getElementById('white-count').innerText = `x ${whiteCount}`;
                 }
+
+                //🔥 播放進洞音效
+                potSound.play();
 
                 // 棋子進洞，移出畫面並停止運動
                 Body.setPosition(piece, { x: -100, y: -100 });
                 Body.setVelocity(piece, { x: 0, y: 0 });
-            } else if (piece.label === 'striker') {
-                // 打擊子進洞，懲罰性重置到發球線
-                Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
-                Body.setVelocity(striker, { x: 0, y: 0 });
             }
+        });
+    });
+
+    //🔥 檢查打擊子 (Striker)
+    pockets.forEach(pocket => {
+        //🔥 計算打擊子與球洞中心點的距離
+        const distS = Vector.magnitude(Vector.sub(striker.position, pocket.position));
+        
+        //🔥 打擊子進洞嚴格判定 (中心點進入距離小於 25px)
+        if (distS < 25 && !isPlacing) { // 擺放模式下不判定進洞
+             //🔥 進洞特效：新增一個特效狀態到陣列中
+             potEffects.push({
+                x: pocket.position.x,
+                y: pocket.position.y,
+                r: 10,        //🔥 初始光圈半徑
+                color: '#c0392b', //🔥 進球光圈顏色 (深紅)
+                life: 30,     //🔥 特效生命週期 (影格數)
+                type: 'striker', //🔥 特效類型
+                //🔥 儲存棋子消失前的最後狀態
+                piecePos: { x: striker.position.x, y: striker.position.y },
+                pieceRad: striker.circleRadius,
+                pieceColor: striker.render.fillStyle
+            });
+
+            //🔥 播放進洞音效
+            potSound.play();
+
+            // 打擊子進洞，懲罰性重置到發球線
+            Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
+            Body.setVelocity(striker, { x: 0, y: 0 });
         }
-    }
+    });
 });
 
 // 6. 互動邏輯 (打擊與擺放)
@@ -186,7 +232,7 @@ let startPoint = null;
 let mousePos = { x: 0, y: 0 };
 let isMoving = false; // 防止移動中重複擊打
 let turnActive = false; // 記錄是否剛擊打過，用來判定何時重置紅球
-let isPlacing = false; //🔥 新增變數：判斷是否正在平行移動紅球
+let isPlacing = false; // 判斷是否正在平行移動紅球
 
 // 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
 window.addEventListener('pointermove', (e) => {
@@ -194,17 +240,17 @@ window.addEventListener('pointermove', (e) => {
     mousePos.x = e.clientX - rect.left;
     mousePos.y = e.clientY - rect.top;
 
-    //🔥 如果正在擺放模式，平行移動紅球
+    // 如果正在擺放模式，平行移動紅球
     if (isPlacing) {
         let newX = mousePos.x;
         const minX = 100 + striker.circleRadius;
         const maxX = WIDTH - 100 - striker.circleRadius;
         
-        //🔥 限制 X 軸移動範圍在發球線的兩側小圓點內
+        // 限制 X 軸移動範圍在發球線的兩側小圓點內
         if (newX < minX) newX = minX;
         if (newX > maxX) newX = maxX;
 
-        //🔥 強制設定位置與清除速度 (鎖定 Y 軸在發球線上)
+        // 強制設定位置與清除速度 (鎖定 Y 軸在發球線上)
         Body.setPosition(striker, { x: newX, y: HEIGHT * 0.8 });
         Body.setVelocity(striker, { x: 0, y: 0 });
     }
@@ -221,11 +267,11 @@ window.addEventListener('pointerdown', (e) => {
     // 簡單的距離檢查，判斷是否點擊在 striker 附近
     const dist = Vector.magnitude(Vector.sub({ x: clickX, y: clickY }, striker.position));
     if (dist < 30) {
-        //🔥 點擊在紅球上 -> 進入瞄準發射模式
+        // 點擊在紅球上 -> 進入瞄準發射模式
         isDragging = true;
         startPoint = { x: striker.position.x, y: striker.position.y };
     } else {
-        //🔥 點擊在紅球外 -> 進入擺放模式，並暫時關閉紅球的物理碰撞
+        // 點擊在紅球外 -> 進入擺放模式，並暫時關閉紅球的物理碰撞
         isPlacing = true;
         striker.isSensor = true;
     }
@@ -233,7 +279,7 @@ window.addEventListener('pointerdown', (e) => {
 
 // 指標放開：施加力量或結束擺放
 window.addEventListener('pointerup', (e) => {
-    //🔥 如果是擺放模式，結束擺放並恢復物理碰撞
+    // 如果是擺放模式，結束擺放並恢復物理碰撞
     if (isPlacing) {
         isPlacing = false;
         striker.isSensor = false; 
@@ -347,7 +393,7 @@ Events.on(render, 'afterRender', () => {
         const pos = p.position;
         const radius = p.circleRadius;
 
-        //🔥 第一步：手動畫出棋子的實體底色與外框 (取代引擎原本的渲染，確保圖層一定蓋住底線)
+        // 手動畫面出棋子的實體底色與外框 (取代引擎原本的渲染，確保圖層一定蓋住底線)
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, radius, 0, 2 * Math.PI);
         ctx.fillStyle = p.render.fillStyle;
@@ -358,7 +404,7 @@ Events.on(render, 'afterRender', () => {
             ctx.stroke();
         }
 
-        //🔥 第二步：畫出棋子上的凹槽與高光細節
+        // 畫出棋子上的凹槽與高光細節
         if (p.label === 'striker') {
             // 打擊子質感 (金色圓環凹槽與高光)
             ctx.beginPath();
@@ -401,5 +447,41 @@ Events.on(render, 'afterRender', () => {
         ctx.setLineDash([8, 8]); // 調整虛線比例
         ctx.stroke();
         ctx.setLineDash([]);
+    }
+
+    // 🔥 5. 繪製與更新進洞特效 (光圈與棋子縮小)
+    for (let i = potEffects.length - 1; i >= 0; i--) {
+        const effect = potEffects[i];
+        
+        ctx.save();
+        //🔥 特效 1：擴散的光圈
+        const alpha = effect.life / 30; //🔥 根據生命週期計算透明度
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r, 0, 2 * Math.PI);
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        //🔥 特效 2：棋子消失前的縮小視覺
+        //🔥 只有生命週期大於 0 時才繪製 (模擬掉進洞裡)
+        if (alpha > 0) {
+            ctx.globalAlpha = alpha * 0.8;
+            const scaledRad = effect.pieceRad * alpha; //🔥 快速縮小半徑
+            ctx.beginPath();
+            ctx.arc(effect.piecePos.x, effect.piecePos.y, scaledRad, 0, 2 * Math.PI);
+            ctx.fillStyle = effect.pieceColor;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        //🔥 更新特效狀態
+        effect.r += 2; //🔥 光圈擴散
+        effect.life--; //🔥 生命週期減少
+
+        //🔥 特效結束後移除
+        if (effect.life <= 0) {
+            potEffects.splice(i, 1);
+        }
     }
 });
