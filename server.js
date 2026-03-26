@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
 
             //🔥 修正為正式的 Gemini 模型名稱
             const response = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-2.5-flash',
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
