@@ -42,10 +42,16 @@ io.on('connection', (socket) => {
     });
 
     //🔥 接收前端請求 AI 進行回合
+    //🔥 接收前端請求 AI 進行回合
     socket.on('requestAIMove', async (gameState) => {
         try {
             //🔥 立即回傳狀態：讓前端知道伺服器正在處理
             socket.emit('aiStatus', '正在觀察盤面與思考策略 (約需 2~4 秒)...');
+
+            //🔥 新增：檢查 API Key 是否存在，若無則立即報錯，避免 SDK 陷入無限等待
+            if (!process.env.GEMINI_API_KEY) {
+                throw new Error("伺服器遺失 GEMINI_API_KEY！請至 Render 後台設定 Environment Variables。");
+            }
 
             const prompt = `
             你是一個正在玩克朗棋 (Carrom) 的對手。你是上方玩家 (Player 2)。你的目標是把【白棋】打進球洞。
@@ -63,7 +69,7 @@ io.on('connection', (socket) => {
             {"strikerX": 300, "forceX": 0.05, "forceY": 0.5}
             `;
 
-            //🔥 修正為正式的 Gemini 模型名稱
+            // 呼叫 Gemini 模型
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,
