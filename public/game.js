@@ -134,12 +134,20 @@ window.addEventListener('pointerup', (e) => {
     const endX = e.clientX - rect.left;
     const endY = e.clientY - rect.top;
 
-    // 計算反向力 (像拉彈弓)
-    const forceMultiplier = 0.08; // 調整力道
-    const forceVector = {
-        x: (startPoint.x - endX) * forceMultiplier,
-        y: (startPoint.y - endY) * forceMultiplier
-    };
+    // 🔥 計算反向力：大幅調降力道基數，避免物理引擎穿透
+    const forceMultiplier = 0.005; 
+    let forceX = (startPoint.x - endX) * forceMultiplier;
+    let forceY = (startPoint.y - endY) * forceMultiplier;
+
+    // 🔥 限制最大力道，防止玩家拉太遠導致球速過快飛出邊界
+    const maxForce = 0.8;
+    const currentForce = Math.sqrt(forceX * forceX + forceY * forceY);
+    if (currentForce > maxForce) {
+        forceX = (forceX / currentForce) * maxForce;
+        forceY = (forceY / currentForce) * maxForce;
+    }
+
+    const forceVector = { x: forceX, y: forceY };
 
     // 應用物理力到 striker
     Body.applyForce(striker, striker.position, forceVector);
