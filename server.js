@@ -80,9 +80,9 @@ io.on('connection', (socket) => {
             - 黑棋座標 (障礙物)：${JSON.stringify(gameState.blackPucks)}
             - 皇后座標：${JSON.stringify(gameState.queen)}
 
-            請運用幾何反射角與質量推算，找出最安全的進球路徑。
+            請運用幾何反射角與質量推算，找出能進最多球的路徑的進球路徑。
             嚴格只回傳 JSON 格式如下，必須是有效的 JSON object：
-            {"strikerX": 300, "forceX": 0.05, "forceY": 0.5}
+            {"strikerX": , "forceX": , "forceY": }
             `;
 
             //🔥 呼叫 Groq API，開啟 json_object 模式確保格式正確
