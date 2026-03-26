@@ -148,8 +148,13 @@ let blackCount = 9;
 let whiteCount = 9;
 let potEffects = []; // 用於儲存進洞特效的狀態 (光圈與棋子縮小)
 
-//🔥 定義當前玩家 (1 為下方，2 為上方)
+// 定義當前玩家 (1 為下方/打黑棋，2 為上方/打白棋)
 let currentPlayer = 1;
+
+//🔥 宣告這回合的擊球結算狀態變數
+let pottedOwnPieceThisTurn = false;
+let pottedStrikerThisTurn = false;
+let pottedQueenThisTurn = false;
 
 // 5. 處理嚴格進洞邏輯 (由 collisionStart 改為在 afterUpdate 中手動計算距離)
 Events.on(engine, 'afterUpdate', () => {
@@ -178,13 +183,17 @@ Events.on(engine, 'afterUpdate', () => {
                     pieceColor: piece.render.fillStyle
                 });
 
-                // 進洞扣除數量邏輯
+                //🔥 進洞扣除數量邏輯與連擊條件判斷
                 if (piece.render.fillStyle === colorBlack) {
                     blackCount--;
                     document.getElementById('black-count').innerText = `x ${blackCount}`;
+                    if (currentPlayer === 1) pottedOwnPieceThisTurn = true; //🔥 玩家1打進黑棋，標記進自己球
                 } else if (piece.render.fillStyle === colorWhite) {
                     whiteCount--;
                     document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                    if (currentPlayer === 2) pottedOwnPieceThisTurn = true; //🔥 玩家2打進白棋，標記進自己球
+                } else if (piece.render.fillStyle === colorQueen) {
+                    pottedQueenThisTurn = true; //🔥 標記皇后進洞
                 }
 
                 // 播放進洞音效
@@ -220,8 +229,10 @@ Events.on(engine, 'afterUpdate', () => {
 
             // 播放進洞音效
             potSound.play();
+            
+            pottedStrikerThisTurn = true; //🔥 標記母球洗澡(犯規)
 
-            //🔥 判斷當前玩家的基準線 Y 座標 (犯規重置仍在當前玩家這邊)
+            // 判斷當前玩家的基準線 Y 座標 (犯規重置仍在當前玩家這邊)
             const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
             Body.setPosition(striker, { x: WIDTH/2, y: resetY });
             Body.setVelocity(striker, { x: 0, y: 0 });
@@ -254,7 +265,7 @@ window.addEventListener('pointermove', (e) => {
         if (newX < minX) newX = minX;
         if (newX > maxX) newX = maxX;
 
-        //🔥 根據當前玩家，決定鎖定在下方 (0.8) 還是上方 (0.2) 的基準線
+        // 根據當前玩家，決定鎖定在下方 (0.8) 還是上方 (0.2) 的基準線
         const lockY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
         
         // 強制設定位置與清除速度
@@ -335,24 +346,34 @@ Events.on(engine, 'afterUpdate', () => {
 
     isMoving = anyMoving;
 
-    //🔥 如果所有球都已經靜止，且是剛擊球後的回合
+    // 如果所有球都已經靜止，且是剛擊球後的回合
     if (!isMoving && turnActive) {
         turnActive = false; // 結束這回合的追蹤狀態
         
-        //🔥 切換玩家 (1 換 2，2 換 1)
-        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        //🔥 判斷是否可以繼續擊球：進了自己的球 且 沒洗澡 且 沒進皇后
+        const keepTurn = pottedOwnPieceThisTurn && !pottedStrikerThisTurn && !pottedQueenThisTurn;
+
+        if (!keepTurn) {
+            // 切換玩家 (1 換 2，2 換 1)
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+        }
+
+        //🔥 重置這回合的狀態標記，為下一回合做準備
+        pottedOwnPieceThisTurn = false;
+        pottedStrikerThisTurn = false;
+        pottedQueenThisTurn = false;
         
-        //🔥 更新 UI 顯示
+        // 更新 UI 顯示
         const turnIndicator = document.getElementById('turn-indicator');
         if (currentPlayer === 1) {
-            turnIndicator.innerText = "現在輪到：玩家 1 (下方)";
+            turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
             turnIndicator.style.color = "#2ecc71"; // 綠色
         } else {
-            turnIndicator.innerText = "現在輪到：玩家 2 (上方)";
+            turnIndicator.innerText = "現在輪到：玩家 2 (上方，白棋)";
             turnIndicator.style.color = "#e74c3c"; // 紅色
         }
 
-        //🔥 根據切換後的新玩家，將紅球強制放回對應發球區中心
+        // 根據當前玩家，將紅球強制放回對應發球區中心
         const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
@@ -396,25 +417,25 @@ Events.on(render, 'afterRender', () => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    //🔥 修正：畫深咖啡色細線兩端的小圓 (必須分開起筆，否則會連成巨大的沙漏多邊形)
+    // 畫深咖啡色細線兩端的小圓 (必須分開起筆，否則會連成巨大的沙漏多邊形)
     ctx.fillStyle = '#3e2723'; // 深咖啡色
     
-    //🔥 下方左端
+    // 下方左端
     ctx.beginPath();
     ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
     ctx.fill();
     
-    //🔥 下方右端
+    // 下方右端
     ctx.beginPath();
     ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
     ctx.fill();
     
-    //🔥 上方左端
+    // 上方左端
     ctx.beginPath();
     ctx.arc(100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
     ctx.fill();
     
-    //🔥 上方右端
+    // 上方右端
     ctx.beginPath();
     ctx.arc(WIDTH - 100, HEIGHT * 0.2, 4, 0, 2 * Math.PI);
     ctx.fill();
