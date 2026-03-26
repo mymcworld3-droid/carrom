@@ -67,6 +67,7 @@ const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, {
     friction: 0.01,     // 降低接觸摩擦力
     mass: 15, // 打擊子質量為棋子的 3 倍
     render: { 
+        visible: false, //🔥 關閉引擎預設渲染，我們將在下面手動繪製，確保圖層完全正確
         fillStyle: colorStriker, 
         strokeStyle: '#f39c12', // 金色細邊框
         lineWidth: 3
@@ -87,17 +88,14 @@ const puckOptions = {
     restitution: 0.8, 
     frictionAir: 0.004, // 大幅降低普通棋子的表面滑行阻力
     friction: 0.01,     // 降低接觸摩擦力
-    mass: 5, // 普通棋子質量為 5
-    render: {
-        lineWidth: 1 // 用於繪製棋子圓環凹槽
-    }
+    mass: 5 // 普通棋子質量為 5
 };
 
 // 1. 中心皇后 (1顆)
 pucks.push(Bodies.circle(cx, cy, puckRadius, { 
     ...puckOptions, 
     id: puckId++, 
-    render: { fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 } // 加入凹槽線
+    render: { visible: false, fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 } //🔥 關閉預設渲染
 }));
 
 // 2. 內圈 (6顆，交替顏色)
@@ -109,7 +107,7 @@ for (let i = 0; i < 6; i++) {
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
-        render: { fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } 
+        render: { visible: false, fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } //🔥 關閉預設渲染
     }));
 }
 
@@ -134,7 +132,7 @@ for (let i = 0; i < 12; i++) {
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
-        render: { fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } 
+        render: { visible: false, fillStyle: color, strokeStyle: '#95a5a6', lineWidth: 1 } //🔥 關閉預設渲染
     }));
 }
 
@@ -251,13 +249,10 @@ Events.on(engine, 'afterUpdate', () => {
 });
 
 // 8. 自定義繪製與視覺化升級
-//🔥 我們將在這裡親手繪製更有質感的棋子、棋盤圖案與拉力線
-//🔥 重點：將中心花形和咖啡色基線移至最前面繪製，確保它們在棋子圖層下面
 Events.on(render, 'afterRender', () => {
     const ctx = render.context;
     
-    //🔥 1. 繪製精緻的棋盤中心玫瑰花紋圖案 (替換原本的中心圓)
-    //🔥 這部分邏輯移至最前面，確保位於棋子下面
+    // 1. 繪製精緻的棋盤中心玫瑰花紋圖案 (在最底層)
     ctx.save();
     ctx.translate(WIDTH/2, HEIGHT/2);
     ctx.beginPath();
@@ -278,27 +273,26 @@ Events.on(render, 'afterRender', () => {
     ctx.fill();
     ctx.restore();
 
-    //🔥 2. 繪製底部的發球線區域 (替換原本的實心線)
-    //🔥 基線顏色更改為半透明深咖啡色，並確保位於棋子下面
+    // 2. 繪製底部的發球線區域 (在花紋上面，但在棋子底下)
     ctx.beginPath();
     // 畫咖啡色細線
     ctx.moveTo(100, HEIGHT * 0.8);
     ctx.lineTo(WIDTH - 100, HEIGHT * 0.8);
-    ctx.strokeStyle = 'rgba(62, 39, 35, 0.6)'; //🔥 半透明深咖啡色
+    ctx.strokeStyle = 'rgba(62, 39, 35, 0.6)'; // 半透明深咖啡色
     ctx.lineWidth = 2;
     ctx.stroke();
     // 畫深咖啡色細線兩端的小圓
     ctx.beginPath();
     ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
     ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = '#3e2723'; //🔥 深咖啡色
+    ctx.fillStyle = '#3e2723'; // 深咖啡色
     ctx.fill();
 
     // 3. 正確的棋子圖層層級排序與繪製
     // 將所有棋子放入一個新陣列，以便進行排序
     const allGamePieces = [...pucks, striker];
 
-    // 根據 Y 軸座標對棋子進行排序。這確保了在畫面下方的棋子覆蓋在畫面下方的棋子上，與圖片中所展示的實體質感和層級感一致。
+    // 根據 Y 軸座標對棋子進行排序。
     allGamePieces.sort((pieceA, pieceB) => pieceA.position.y - pieceB.position.y);
 
     // 繪製排序後的棋子，確保正確的圖層層級
@@ -308,8 +302,19 @@ Events.on(render, 'afterRender', () => {
 
         const pos = p.position;
         const radius = p.circleRadius;
-        const color = p.render.fillStyle;
 
+        //🔥 第一步：手動畫出棋子的實體底色與外框 (取代引擎原本的渲染，確保圖層一定蓋住底線)
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = p.render.fillStyle;
+        ctx.fill();
+        if (p.render.strokeStyle) {
+            ctx.strokeStyle = p.render.strokeStyle;
+            ctx.lineWidth = p.render.lineWidth || 1;
+            ctx.stroke();
+        }
+
+        //🔥 第二步：畫出棋子上的凹槽與高光細節
         if (p.label === 'striker') {
             // 打擊子質感 (金色圓環凹槽與高光)
             ctx.beginPath();
@@ -342,13 +347,12 @@ Events.on(render, 'afterRender', () => {
         }
     });
 
-    // 4. 繪製拉力線 (拖曳時顯示)
-    //🔥 拉力線圖層也應位於棋子下面
+    // 4. 繪製拉力線 (拖曳時顯示，畫在所有東西的最高層)
     if (isDragging && startPoint) {
         ctx.beginPath();
         ctx.moveTo(startPoint.x, startPoint.y);
         ctx.lineTo(mousePos.x, mousePos.y);
-        ctx.strokeStyle = 'rgba(62, 39, 35, 0.7)'; //🔥 使用咖啡色拉力線
+        ctx.strokeStyle = 'rgba(62, 39, 35, 0.7)'; // 使用咖啡色拉力線
         ctx.lineWidth = 5; // 稍微加粗一點
         ctx.setLineDash([8, 8]); // 調整虛線比例
         ctx.stroke();
