@@ -3,49 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>克朗棋 (單機精緻版)</title>
+    <title>克朗棋 (單機精緻版 V2)</title>
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; 
-            background-color: #2c3e50; /*🔥 更換為質感較好的背景色*/
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-            color: #ecf0f1; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /*🔥 更換為較現代的字體*/
-            touch-action: none; 
-        }
-        canvas { 
-            box-shadow: 0 15px 30px rgba(0,0,0,0.6); /*🔥 增加更深的陰影*/
-            border-radius: 8px; /*🔥 給棋盤加點圓角*/
-        }
-        #ui { 
-            position: absolute; 
-            top: 20px; 
-            left: 20px; 
-            background: rgba(0,0,0,0.7); /*🔥 更深的半透明背景*/
-            padding: 20px; 
-            border-radius: 12px; 
-            pointer-events: none; 
-            border: 1px solid rgba(255,255,255,0.1); /*🔥 增加細微的邊框*/
-        }
-        #ui h3 { 
-            margin: 0 0 10px 0; 
-            color: #f1c40f; /*🔥 標題使用金色*/
-        }
-        #ui p { 
-            margin: 5px 0; 
-            font-size: 14px; 
-            color: #bdc3c7; 
-        }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; display: flex; justify-content: center; align-items: center; height: 100vh; color: #ecf0f1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
+        canvas { box-shadow: 0 15px 30px rgba(0,0,0,0.6); border-radius: 8px; }
+        #ui { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 12px; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
+        #ui h3 { margin: 0 0 10px 0; color: #f1c40f; }
+        #ui p { margin: 5px 0; font-size: 14px; color: #bdc3c7; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h3>克朗棋 (單機精緻版)</h3>
+        <h3>克朗棋 (單機精緻版 V2)</h3>
         <p>拖曳擊打紅色打擊子 (Striker)</p>
         <p>單人練習模式</p>
     </div>
