@@ -1,14 +1,20 @@
-const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events } = Matter;
+const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events, Mouse, MouseConstraint } = Matter;
 
+// 遊戲區域設定
 const WIDTH = 600;
 const HEIGHT = 600;
 
+// 🔥 --- 定義自定義顏色 --- 🔥
+// Brown/Coffee color for table elements
+const tableDetailColor = 'rgba(93, 64, 55, 0.6)'; // Table detail brown for pattern and baseline
+const queenColor = '#d35400'; // 皇后橘紅
+
 // 1. 初始化物理引擎
 const engine = Engine.create({
-    positionIterations: 10, // 提高精確度，防止高速穿透
+    positionIterations: 10,
     velocityIterations: 10
 });
-engine.world.gravity.y = 0; // 俯視圖，無重力
+engine.world.gravity.y = 0; // 俯視圖無重力
 
 // 2. 初始化渲染器
 const render = Render.create({
@@ -20,7 +26,6 @@ const render = Render.create({
         wireframes: false, // 顯示實心物體
         background: '#e0c097', // 木質棋盤色
         showAngleIndicator: false,
-        // 啟用自定義渲染，這樣我們才能自己動手畫更好看的元素
         hasBounds: true
     }
 });
@@ -30,9 +35,9 @@ const runner = Runner.create();
 Runner.run(runner, engine);
 
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
-const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 }; // 將摩擦力 friction 設為 0
+const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 };
 
-// 加厚牆壁厚度到 100px 並向外偏移。畫面上看起來一樣是 20px 的邊框，但物理上是一堵厚牆，徹底防止高速穿透
+// 加厚牆壁厚度並向外偏移。視覺上看起来是一樣的邊框，但物理上是一堵厚牆，彻底防止高速穿透
 const walls = [
     Bodies.rectangle(WIDTH/2, -30, WIDTH + 200, 100, wallOptions), // 上
     Bodies.rectangle(WIDTH/2, HEIGHT + 30, WIDTH + 200, 100, wallOptions), // 下
@@ -42,7 +47,6 @@ const walls = [
 
 // 建立四個角落的球洞
 const pocketRadius = 30;
-// 給球洞加一點內部陰影效果， label 用來辨識球洞
 const pocketOptions = { isStatic: true, isSensor: true, label: 'pocket', render: { fillStyle: '#1a1a1a' } };
 const pockets = [
     Bodies.circle(30, 30, pocketRadius, pocketOptions),
@@ -53,24 +57,14 @@ const pockets = [
 
 // 4. 建立棋子
 
-// 定義棋子外觀顏色 (使用更有質感的色調)
-const colorQueen = '#d35400'; // 皇后 (紅/橘)
-const colorWhite = '#ecf0f1'; // 白棋
-const colorBlack = '#2c3e50'; // 黑棋
-const colorStriker = '#c0392b'; // 打擊子 (深紅)
-
-// 打擊子 (Striker) - 較大，設定質量
+// 打擊子 (Striker) - 較大
 const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, { 
     label: 'striker',
     restitution: 0.6, 
-    frictionAir: 0.008, // 降低表面滑行阻力
-    friction: 0.01,     // 降低接觸摩擦力
-    mass: 15, // 打擊子質量為棋子的 3 倍
-    render: { 
-        fillStyle: colorStriker, 
-        strokeStyle: '#f39c12', // 金色細邊框
-        lineWidth: 3
-    } 
+    frictionAir: 0.008, // 降低阻力，更滑
+    friction: 0.01,
+    mass: 15,
+    render: { fillStyle: '#c0392b', strokeStyle: '#f39c12', lineWidth: 3 } // 打擊子質感
 });
 
 // 目標棋子 (Pucks) - 黑白紅標準六角形排法
@@ -78,26 +72,23 @@ const pucks = [];
 const cx = WIDTH / 2;
 const cy = HEIGHT / 2;
 const puckRadius = 12;
-const gap = 24.5; // 稍微大於直徑(24)一點點，避免物理引擎剛載入時因邊緣重疊而爆開
+const gap = 24.5; // 稍微大於直徑(24)，避免初始載入時爆開
 let puckId = 100;
 
-// 定義普通棋子與皇后的物理屬性
 const puckOptions = {
     label: 'puck',
     restitution: 0.8, 
-    frictionAir: 0.004, // 大幅降低普通棋子的表面滑行阻力
-    friction: 0.01,     // 降低接觸摩擦力
-    mass: 5, // 普通棋子質量為 5
-    render: {
-        lineWidth: 1 // 用於繪製棋子圓環凹槽
-    }
+    frictionAir: 0.004, // 棋子更滑
+    friction: 0.01,
+    mass: 5,
+    render: { lineWidth: 1 } // 用於凹槽視覺
 };
 
-// 1. 中心皇后 (1顆)
+// 1. 中心皇后 (1顆橘紅)
 pucks.push(Bodies.circle(cx, cy, puckRadius, { 
     ...puckOptions, 
     id: puckId++, 
-    render: { fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 } // 加入凹槽線
+    render: { fillStyle: queenColor, strokeStyle: '#e67e22', lineWidth: 1 } 
 }));
 
 // 2. 內圈 (6顆，交替顏色)
@@ -105,7 +96,7 @@ for (let i = 0; i < 6; i++) {
     const angle = (i * Math.PI) / 3;
     const x = cx + Math.cos(angle) * gap;
     const y = cy + Math.sin(angle) * gap;
-    const color = (i % 2 === 0) ? colorWhite : colorBlack;
+    const color = (i % 2 === 0) ? '#ecf0f1' : '#2c3e50';
     pucks.push(Bodies.circle(x, y, puckRadius, { 
         ...puckOptions, 
         id: puckId++, 
@@ -113,20 +104,17 @@ for (let i = 0; i < 6; i++) {
     }));
 }
 
-// 3. 外圈 (12顆)
-// 為了達到標準的 9白 9黑，並形成白棋的 Y 字型，外圈的 6 個「角」為白，6 個「邊中點」為黑
+// 3. 外圈 (12顆，交替顏色 Y 字型對齊)
 for (let i = 0; i < 12; i++) {
     const angle = (i * Math.PI) / 6;
     let dist, color;
     
     if (i % 2 === 0) {
-        // 角落 (0, 60, 120...度)
         dist = gap * 2;
-        color = colorWhite;
+        color = '#ecf0f1'; // 角落白
     } else {
-        // 邊緣中點 (30, 90, 150...度)
         dist = gap * Math.sqrt(3);
-        color = colorBlack;
+        color = '#2c3e50'; // 邊中點黑
     }
     
     const x = cx + Math.cos(angle) * dist;
@@ -153,7 +141,7 @@ Events.on(engine, 'collisionStart', (event) => {
 
         if (pocket && piece) {
             if (piece.label === 'puck') {
-                // 棋子進洞，移出畫面並停止運動
+                // 棋子進洞，移出畫面
                 Body.setPosition(piece, { x: -100, y: -100 });
                 Body.setVelocity(piece, { x: 0, y: 0 });
             } else if (piece.label === 'striker') {
@@ -165,97 +153,67 @@ Events.on(engine, 'collisionStart', (event) => {
     }
 });
 
-// 6. 互動邏輯 (打擊)
+// 6. 滑鼠控制與互動 (原本的 MouseConstraint)
+let mouse = Mouse.create(render.canvas),
+    mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+            stiffness: 0.2,
+            render: {
+                visible: false
+            }
+        }
+    });
+Composite.add(engine.world, mouseConstraint);
+render.mouse = mouse;
 
-let isDragging = false;
-let startPoint = null;
-let mousePos = { x: 0, y: 0 };
-let isMoving = false; // 防止移動中重複擊打
-let turnActive = false; // 新增變數：記錄是否剛擊打過，用來判定何時重置紅球
+// 互動狀態
+let dragging = false;
 
-// 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
 window.addEventListener('pointermove', (e) => {
     const rect = render.canvas.getBoundingClientRect();
-    mousePos.x = e.clientX - rect.left;
-    mousePos.y = e.clientY - rect.top;
+    const mousePos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
 });
 
-// 指標按下：檢查是否點擊在打擊子上
 window.addEventListener('pointerdown', (e) => {
-    if (isMoving) return; // 棋子移動中不允許拖曳
-
+    // 檢查是否點擊 striker 附近以啟用拖曳效果 (標準滑鼠控制仍然生效，此為自定義邏輯)
     const rect = render.canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
-
+    const strikerPos = striker.position;
+    
     // 簡單的距離檢查，判斷是否點擊在 striker 附近
-    const dist = Vector.magnitude(Vector.sub({ x: clickX, y: clickY }, striker.position));
-    if (dist < 30) {
-        isDragging = true;
-        startPoint = { x: striker.position.x, y: striker.position.y };
+    const dist = Vector.magnitude(Vector.sub({ x: clickX, y: clickY }, strikerPos));
+    if (dist < 40) {
+        dragging = true;
     }
 });
 
-// 指標放開：施加力量
 window.addEventListener('pointerup', (e) => {
-    if (!isDragging) return;
-    isDragging = false;
-
-    const rect = render.canvas.getBoundingClientRect();
-    const endX = e.clientX - rect.left;
-    const endY = e.clientY - rect.top;
-
-    // 計算反向力：大幅調降力道基數，避免物理引擎穿透
-    const forceMultiplier = 0.005; 
-    let forceX = (startPoint.x - endX) * forceMultiplier;
-    let forceY = (startPoint.y - endY) * forceMultiplier;
-
-    // 限制最大力道，防止玩家拉太遠導致球速過快飛出邊界
-    const maxForce = 0.8;
-    const currentForce = Math.sqrt(forceX * forceX + forceY * forceY);
-    if (currentForce > maxForce) {
-        forceX = (forceX / currentForce) * maxForce;
-        forceY = (forceY / currentForce) * maxForce;
-    }
-
-    const forceVector = { x: forceX, y: forceY };
-
-    // 應用物理力到 striker
-    Body.applyForce(striker, striker.position, forceVector);
-
-    // 延遲一點點再標記回合進行中，確保物理引擎已經賦予球體速度
-    setTimeout(() => {
-        turnActive = true;
-    }, 50);
-});
-
-// 7. 檢查是否所有棋子都靜止
-Events.on(engine, 'afterUpdate', () => {
-    let anyMoving = false;
-    // 檢查速度是否大於微小值
-    if (striker.speed > 0.1) anyMoving = true;
-    pucks.forEach(p => {
-        if (p.speed > 0.1) anyMoving = true;
-    });
-
-    isMoving = anyMoving;
-
-    // 如果所有球都已經靜止，且是擊球後的回合，則重置紅球位置
-    if (!isMoving && turnActive) {
-        turnActive = false; // 結束這回合的追蹤狀態
+    // 在放開滑鼠時，如果正在拖曳 stiker，標記回合開始
+    if (dragging) {
+        dragging = false;
         
-        // 把紅球強制放回發球區中心
-        Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 });
+        //🔥 修正拼寫錯誤: Body.setPosition(stiker, ...) -> striker
+        Body.setPosition(striker, { x: WIDTH/2, y: HEIGHT * 0.8 }); // 重置紅球位置
         Body.setVelocity(striker, { x: 0, y: 0 });
     }
 });
 
-// 8. 自定義繪製與視覺化升級
-// 我們將在這裡親手繪製更有質感的棋子、棋盤圖案與拉力線
-Events.on(render, 'afterRender', () => {
+// 🔥 --- 自定義繪製：確保元素層級 (Table elements under pieces) --- 🔥
+
+// 🔥 將原本 afterRender 中的背景繪製邏輯移至 beforeRender 事件。
+// 🔥 Matter.js 標準渲染器會在 beforeRender 事件之後繪製實體（棋子），
+// 🔥 確保了背景圖案在下方。
+Events.on(render, 'beforeRender', (event) => {
     const ctx = render.context;
-    
-    // 1. 繪製精緻的棋盤中心玫瑰花紋圖案 (替換原本的中心圓)
+    // Context is clean (just background color). Draw table details.
+
+    // 1. --- 桌子中間的花形 Pattern (Below pieces) ---
+    // Deep Brown color for a wood carving look.
     ctx.save();
     ctx.translate(WIDTH/2, HEIGHT/2);
     ctx.beginPath();
@@ -266,88 +224,53 @@ Events.on(render, 'afterRender', () => {
         ctx.bezierCurveTo(20, -50, 40, -50, 0, -80);
         ctx.bezierCurveTo(-40, -50, -20, -50, 0, 0);
     }
-    ctx.strokeStyle = 'rgba(93, 64, 55, 0.4)'; // 使用半透明的深褐色，看起來像木頭雕刻
+    // 使用深褐色 (Table detail brown)，看起來像木頭雕刻
+    ctx.strokeStyle = tableDetailColor; 
     ctx.lineWidth = 2;
     ctx.stroke();
-    // 畫中心小圓
+    // 畫皇后位置小圓
     ctx.beginPath();
     ctx.arc(0, 0, 8, 0, 2 * Math.PI);
-    ctx.fillStyle = '#d35400';
+    ctx.fillStyle = queenColor;
     ctx.fill();
     ctx.restore();
 
-    // 2. 繪製底部的發球線區域 (替換原本的實心線)
+    // 2. --- 基準線 Baseline (Below pieces, Coffee Brown color) ---
+    // baseline is defined at HEIGHT * 0.8
+    const baselineY = HEIGHT * 0.8;
     ctx.beginPath();
-    // 畫一條金色細線
-    ctx.moveTo(100, HEIGHT * 0.8);
-    ctx.lineTo(WIDTH - 100, HEIGHT * 0.8);
-    ctx.strokeStyle = 'rgba(241, 196, 15, 0.6)'; // 半透明金色
+    // 🔥 畫一條咖啡色細線 (Coffee brown)
+    ctx.moveTo(100, baselineY);
+    ctx.lineTo(WIDTH - 100, baselineY);
+    // 使用咖啡色 (Table detail brown)
+    ctx.strokeStyle = tableDetailColor; 
     ctx.lineWidth = 2;
     ctx.stroke();
-    // 畫金色細線兩端的小圓
+    // 畫咖啡色細線兩端的小圓
     ctx.beginPath();
-    ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
-    ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = '#f1c40f';
+    ctx.arc(100, baselineY, 4, 0, 2 * Math.PI);
+    ctx.arc(WIDTH - 100, baselineY, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = tableDetailColor;
     ctx.fill();
+});
 
-    // 3. 繪製拉力線 (拖曳時顯示)
-    if (isDragging && startPoint) {
+// Interaction/Foreground visual line (On top of pieces)
+Events.on(render, 'afterRender', () => {
+    // Standard renderer already drew bodies.
+
+    // 視覺拉線效果 (Dashed white line on top)
+    if (dragging && mouseConstraint.body && mouseConstraint.body.label === 'striker') {
+        const ctx = render.context;
+        const strikerPos = mouseConstraint.body.position;
+        const mousePos = mouseConstraint.mouse.position;
+        
         ctx.beginPath();
-        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.moveTo(strikerPos.x, strikerPos.y);
         ctx.lineTo(mousePos.x, mousePos.y);
-        ctx.strokeStyle = 'rgba(241, 196, 15, 0.7)'; // 使用金色拉力線
-        ctx.lineWidth = 5; // 稍微加粗一點
-        ctx.setLineDash([8, 8]); // 調整虛線比例
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; // 半透明白色虛線
+        ctx.lineWidth = 4;
+        ctx.setLineDash([5, 5]); // 虛線樣式
         ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.setLineDash([]); // 重置虛線
     }
-
-    // 4. 正確的棋子圖層層級排序與繪製
-    // 將所有棋子放入一個新陣列，以便進行排序
-    const allGamePieces = [...pucks, striker];
-
-    // 根據 Y 軸座標對棋子進行排序。這確保了在畫面下方的棋子覆蓋在畫面下方的棋子上，與圖片中所展示的實體質感和層級感一致。
-    allGamePieces.sort((pieceA, pieceB) => pieceA.position.y - pieceB.position.y);
-
-    // 繪製排序後的棋子，確保正確的圖層層級
-    allGamePieces.forEach(p => {
-        // 只有還在棋盤上的棋子才需要畫
-        if (p.position.x === -100) return;
-
-        const pos = p.position;
-        const radius = p.circleRadius;
-        const color = p.render.fillStyle;
-
-        if (p.label === 'striker') {
-            // 打擊子紋理
-            ctx.beginPath();
-            // 畫金色同心圓環
-            ctx.arc(pos.x, pos.y, radius - 5, 0, 2 * Math.PI);
-            ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)'; // 半透明金色凹槽
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // 加入高光 (圓弧線)，營造光澤感
-            ctx.beginPath();
-            ctx.arc(pos.x - radius/3, pos.y - radius/3, radius/3, 1 * Math.PI, 1.5 * Math.PI);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // 半透明白色高光
-            ctx.lineWidth = 3;
-            ctx.stroke();
-        } else {
-            // 普通棋子紋理
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, radius - 3, 0, 2 * Math.PI); // 畫一個較小的同心圓
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'; // 極細微的凹槽陰影
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // 加入一個微小的高光 (圓弧線)，營造光澤感
-            ctx.beginPath();
-            ctx.arc(pos.x - radius/3, pos.y - radius/3, radius/3, 1 * Math.PI, 1.5 * Math.PI);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // 半透明白色高光
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-    });
 });
