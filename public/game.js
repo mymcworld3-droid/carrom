@@ -179,24 +179,40 @@ Events.on(engine, 'collisionStart', (event) => {
     }
 });
 
-// 6. 互動邏輯 (打擊)
+// 6. 互動邏輯 (打擊與擺放)
 
 let isDragging = false;
 let startPoint = null;
 let mousePos = { x: 0, y: 0 };
 let isMoving = false; // 防止移動中重複擊打
-let turnActive = false; // 新增變數：記錄是否剛擊打過，用來判定何時重置紅球
+let turnActive = false; // 記錄是否剛擊打過，用來判定何時重置紅球
+let isPlacing = false; //🔥 新增變數：判斷是否正在平行移動紅球
 
 // 監聽指標移動 (PointerEvent 同時支援滑鼠與觸控螢幕)
 window.addEventListener('pointermove', (e) => {
     const rect = render.canvas.getBoundingClientRect();
     mousePos.x = e.clientX - rect.left;
     mousePos.y = e.clientY - rect.top;
+
+    //🔥 如果正在擺放模式，平行移動紅球
+    if (isPlacing) {
+        let newX = mousePos.x;
+        const minX = 100 + striker.circleRadius;
+        const maxX = WIDTH - 100 - striker.circleRadius;
+        
+        //🔥 限制 X 軸移動範圍在發球線的兩側小圓點內
+        if (newX < minX) newX = minX;
+        if (newX > maxX) newX = maxX;
+
+        //🔥 強制設定位置與清除速度 (鎖定 Y 軸在發球線上)
+        Body.setPosition(striker, { x: newX, y: HEIGHT * 0.8 });
+        Body.setVelocity(striker, { x: 0, y: 0 });
+    }
 });
 
 // 指標按下：檢查是否點擊在打擊子上
 window.addEventListener('pointerdown', (e) => {
-    if (isMoving) return; // 棋子移動中不允許拖曳
+    if (isMoving) return; // 棋子移動中不允許拖曳或擺放
 
     const rect = render.canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -205,13 +221,25 @@ window.addEventListener('pointerdown', (e) => {
     // 簡單的距離檢查，判斷是否點擊在 striker 附近
     const dist = Vector.magnitude(Vector.sub({ x: clickX, y: clickY }, striker.position));
     if (dist < 30) {
+        //🔥 點擊在紅球上 -> 進入瞄準發射模式
         isDragging = true;
         startPoint = { x: striker.position.x, y: striker.position.y };
+    } else {
+        //🔥 點擊在紅球外 -> 進入擺放模式，並暫時關閉紅球的物理碰撞
+        isPlacing = true;
+        striker.isSensor = true;
     }
 });
 
-// 指標放開：施加力量
+// 指標放開：施加力量或結束擺放
 window.addEventListener('pointerup', (e) => {
+    //🔥 如果是擺放模式，結束擺放並恢復物理碰撞
+    if (isPlacing) {
+        isPlacing = false;
+        striker.isSensor = false; 
+        return;
+    }
+
     if (!isDragging) return;
     isDragging = false;
 
