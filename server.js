@@ -44,6 +44,9 @@ io.on('connection', (socket) => {
     //🔥 接收前端請求 AI 進行回合
     socket.on('requestAIMove', async (gameState) => {
         try {
+            //🔥 立即回傳狀態：讓前端知道伺服器正在處理
+            socket.emit('aiStatus', '正在觀察盤面與思考策略 (約需 2~4 秒)...');
+
             const prompt = `
             你是一個正在玩克朗棋 (Carrom) 的對手。你是上方玩家 (Player 2)。你的目標是把【白棋】打進球洞。
             棋盤大小是 600x600。
@@ -62,12 +65,15 @@ io.on('connection', (socket) => {
 
             //🔥 修正為正式的 Gemini 模型名稱
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
                 }
             });
+
+            //🔥 思考完畢，準備回傳動作
+            socket.emit('aiStatus', '思考完畢！正在擺放打擊子...');
 
             const move = JSON.parse(response.text);
             socket.emit('aiMove', move);
