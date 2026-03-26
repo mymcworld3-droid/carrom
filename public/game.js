@@ -663,3 +663,18 @@ socket.on('aiMove', (move) => {
         }, 50);
     }, 1000);
 });
+socket.on('aiError', (errorMessage) => {
+    const errorToast = document.getElementById('error-toast');
+    if (errorToast) {
+        errorToast.innerText = errorMessage; // 寫入錯誤內容
+        errorToast.style.display = 'block';  // 顯示提示框
+        
+        // 5 秒後自動隱藏
+        setTimeout(() => {
+            errorToast.style.display = 'none';
+        }, 5000);
+    } else {
+        // 如果找不到 HTML 元素，則退回使用系統內建的警告視窗
+        alert(errorMessage);
+    }
+});
