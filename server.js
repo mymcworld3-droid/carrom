@@ -71,7 +71,7 @@ io.on('connection', (socket) => {
 
             // 呼叫 Gemini 模型
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.5-lite',
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
