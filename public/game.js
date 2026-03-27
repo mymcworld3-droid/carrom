@@ -688,7 +688,7 @@ document.getElementById('btn-reset-ai').addEventListener('click', async () => {
 document.getElementById('btn-bg-train').addEventListener('click', async () => {
     if (isBackgroundTraining) return;
     isBackgroundTraining = true;
-    bgTrainingTarget = 50;
+    bgTrainingTarget = 500;
     bgTrainingCurrent = 0;
     
     if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
@@ -723,7 +723,7 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
     document.querySelector('canvas').style.display = 'block';
     
     resetGame();
-    alert("⚡ 精神時光屋修煉完成！50 局極速訓練已結束，AI 大腦已存檔！");
+    alert("⚡ 精神時光屋修煉完成！500 局極速訓練已結束，AI 大腦已存檔！");
 });
 
 
