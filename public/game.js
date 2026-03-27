@@ -94,14 +94,14 @@ const puckOptions = {
     mass: 5 
 };
 
-// 中心皇后
+// 中心皇后 (id: 100)
 pucks.push(Bodies.circle(cx, cy, puckRadius, { 
     ...puckOptions, 
     id: puckId++, 
     render: { visible: false, fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 }
 }));
 
-// 內圈
+// 內圈 (id: 101~106)
 for (let i = 0; i < 6; i++) {
     const angle = (i * Math.PI) / 3;
     const x = cx + Math.cos(angle) * gap;
@@ -114,7 +114,7 @@ for (let i = 0; i < 6; i++) {
     }));
 }
 
-// 外圈
+// 外圈 (id: 107~118)
 for (let i = 0; i < 12; i++) {
     const angle = (i * Math.PI) / 6;
     let dist, color;
@@ -146,17 +146,22 @@ let currentPlayer = 1;
 let pottedOwnPieceThisTurn = false;
 let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
-let hitAnyPuckThisTurn = false; // 追蹤這回合是否打到任何棋子
+let hitAnyPuckThisTurn = false; 
 let piecesPottedThisTurn = []; 
 
 // 用於機器學習的狀態追蹤與掛機系統
 let lastAIState = null;
 let lastAIAction = null;
-let isSelfPlayTraining = false; // 是否開啟 AI 左右互搏模式
-let totalTurnsThisGame = 0; // 記錄打了幾桿，避免死局
-let currentTrainingSpeed = 10; // 記錄當前使用者設定的訓練速度
+let isSelfPlayTraining = false; 
+let totalTurnsThisGame = 0; 
+let currentTrainingSpeed = 10; 
 
-// 全局碰撞監聽器，確認打擊子有沒有撞到目標
+//🔥 新增：背景極速訓練專用變數
+let isBackgroundTraining = false;
+let bgTrainingTarget = 0;
+let bgTrainingCurrent = 0;
+
+// 全局碰撞監聽器
 Events.on(engine, 'collisionStart', (event) => {
     event.pairs.forEach(pair => {
         const { bodyA, bodyB } = pair;
@@ -167,7 +172,7 @@ Events.on(engine, 'collisionStart', (event) => {
     });
 });
 
-// 5. 處理嚴格進洞邏輯
+// 5. 處理嚴格進洞邏輯 (每個物理 Tick 都會執行)
 Events.on(engine, 'afterUpdate', () => {
     pucks.forEach(piece => {
         if (piece.position.x === -100) return;
@@ -192,17 +197,17 @@ Events.on(engine, 'afterUpdate', () => {
 
                 if (piece.render.fillStyle === colorBlack) {
                     blackCount--;
-                    document.getElementById('black-count').innerText = `x ${blackCount}`;
+                    if(!isBackgroundTraining) document.getElementById('black-count').innerText = `x ${blackCount}`;
                     if (currentPlayer === 1) pottedOwnPieceThisTurn = true; 
                 } else if (piece.render.fillStyle === colorWhite) {
                     whiteCount--;
-                    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                    if(!isBackgroundTraining) document.getElementById('white-count').innerText = `x ${whiteCount}`;
                     if (currentPlayer === 2) pottedOwnPieceThisTurn = true; 
                 } else if (piece.render.fillStyle === colorQueen) {
                     pottedQueenThisTurn = true; 
                 }
 
-                if(!isSelfPlayTraining) potSound.play(); // 訓練時為了效能關閉音效
+                if(!isSelfPlayTraining && !isBackgroundTraining) potSound.play(); 
                 Body.setPosition(piece, { x: -100, y: -100 });
                 Body.setVelocity(piece, { x: 0, y: 0 });
             }
@@ -225,7 +230,7 @@ Events.on(engine, 'afterUpdate', () => {
                 pieceColor: striker.render.fillStyle
             });
 
-            if(!isSelfPlayTraining) potSound.play();
+            if(!isSelfPlayTraining && !isBackgroundTraining) potSound.play();
             pottedStrikerThisTurn = true; 
 
             const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
@@ -233,6 +238,11 @@ Events.on(engine, 'afterUpdate', () => {
             Body.setVelocity(striker, { x: 0, y: 0 });
         }
     });
+
+    //🔥 在正常遊戲模式下，每一幀檢查回合是否結束
+    if (!isBackgroundTraining) {
+        checkTurnEndAsync();
+    }
 });
 
 // 6. 互動邏輯
@@ -244,7 +254,7 @@ let turnActive = false;
 let isPlacing = false; 
 
 window.addEventListener('pointermove', (e) => {
-    if (isSelfPlayTraining || currentPlayer === 2) return; 
+    if (isSelfPlayTraining || isBackgroundTraining || currentPlayer === 2) return; 
     const rect = render.canvas.getBoundingClientRect();
     mousePos.x = e.clientX - rect.left;
     mousePos.y = e.clientY - rect.top;
@@ -264,7 +274,7 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerdown', (e) => {
-    if (isSelfPlayTraining || currentPlayer === 2) return; 
+    if (isSelfPlayTraining || isBackgroundTraining || currentPlayer === 2) return; 
     if (isMoving) return; 
 
     const rect = render.canvas.getBoundingClientRect();
@@ -282,7 +292,7 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointerup', (e) => {
-    if (isSelfPlayTraining || currentPlayer === 2) return; 
+    if (isSelfPlayTraining || isBackgroundTraining || currentPlayer === 2) return; 
     if (isPlacing) {
         isPlacing = false;
         striker.isSensor = false; 
@@ -317,8 +327,50 @@ window.addEventListener('pointerup', (e) => {
     }, 50);
 });
 
-// 7. 檢查是否所有棋子都靜止，並處理回合切換
-Events.on(engine, 'afterUpdate', async () => {
+//🔥 新增：瞬間重置盤面功能 (避免重新載入網頁拖慢訓練)
+function resetGame() {
+    blackCount = 9;
+    whiteCount = 9;
+    currentPlayer = 1;
+    totalTurnsThisGame = 0;
+    turnActive = false;
+    isMoving = false;
+    hitAnyPuckThisTurn = false;
+    pottedOwnPieceThisTurn = false;
+    pottedStrikerThisTurn = false;
+    pottedQueenThisTurn = false;
+    piecesPottedThisTurn = [];
+    potEffects = [];
+
+    document.getElementById('black-count').innerText = `x ${blackCount}`;
+    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+
+    // 將所有棋子依照初始排法放回中間
+    const queen = pucks.find(p => p.id === 100);
+    Body.setPosition(queen, { x: cx, y: cy });
+    Body.setVelocity(queen, { x: 0, y: 0 });
+
+    for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI) / 3;
+        const p = pucks.find(p => p.id === 101 + i);
+        Body.setPosition(p, { x: cx + Math.cos(angle) * gap, y: cy + Math.sin(angle) * gap });
+        Body.setVelocity(p, { x: 0, y: 0 });
+    }
+
+    for (let i = 0; i < 12; i++) {
+        const angle = (i * Math.PI) / 6;
+        let dist = (i % 2 === 0) ? gap * 2 : gap * Math.sqrt(3);
+        const p = pucks.find(p => p.id === 107 + i);
+        Body.setPosition(p, { x: cx + Math.cos(angle) * dist, y: cy + Math.sin(angle) * dist });
+        Body.setVelocity(p, { x: 0, y: 0 });
+    }
+
+    Body.setPosition(striker, { x: WIDTH / 2, y: HEIGHT * 0.8 });
+    Body.setVelocity(striker, { x: 0, y: 0 });
+}
+
+//🔥 將原本的在 afterUpdate 中的回合結算，獨立成非同步函式，以便背景訓練能完美等待
+async function checkTurnEndAsync() {
     let anyMoving = false;
     if (striker.speed > 0.1) anyMoving = true;
     pucks.forEach(p => {
@@ -328,8 +380,8 @@ Events.on(engine, 'afterUpdate', async () => {
     isMoving = anyMoving;
 
     if (!isMoving && turnActive) {
-        turnActive = false; 
-        totalTurnsThisGame++; // 記錄打擊次數
+        turnActive = false; // 鎖定狀態，避免重複進入
+        totalTurnsThisGame++; 
         
         let isFoulQueen = false;
         if (pottedQueenThisTurn) {
@@ -343,11 +395,9 @@ Events.on(engine, 'afterUpdate', async () => {
         let isFoul = isFoulQueen || pottedStrikerThisTurn || isFoulMiss;
 
         // 強化學習獎勵結算
-        if ((currentPlayer === 2 || isSelfPlayTraining) && lastAIState && lastAIAction) {
-            let reward = -0.1; // 基礎懲罰
+        if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && lastAIState && lastAIAction) {
+            let reward = -0.1; 
             if (pottedOwnPieceThisTurn) reward += 10.0; 
-            
-            // 犯規懲罰
             if (pottedStrikerThisTurn) reward -= 10.0; 
             if (isFoulQueen) reward -= 10.0; 
             if (isFoulMiss) reward -= 10.0;  
@@ -355,7 +405,7 @@ Events.on(engine, 'afterUpdate', async () => {
             await carromBrain.train(lastAIState, lastAIAction, reward);
         }
 
-        // 如果有任何犯規，執行退球懲罰
+        // 如果有犯規，執行退球懲罰
         if (isFoul) {
             piecesPottedThisTurn.forEach(p => {
                 const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
@@ -365,10 +415,10 @@ Events.on(engine, 'afterUpdate', async () => {
 
                 if (p.render.fillStyle === colorBlack) {
                     blackCount++;
-                    document.getElementById('black-count').innerText = `x ${blackCount}`;
+                    if(!isBackgroundTraining) document.getElementById('black-count').innerText = `x ${blackCount}`;
                 } else if (p.render.fillStyle === colorWhite) {
                     whiteCount++;
-                    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                    if(!isBackgroundTraining) document.getElementById('white-count').innerText = `x ${whiteCount}`;
                 }
             });
 
@@ -383,10 +433,10 @@ Events.on(engine, 'afterUpdate', async () => {
                 
                 if (myColor === colorBlack) {
                     blackCount++;
-                    document.getElementById('black-count').innerText = `x ${blackCount}`;
+                    if(!isBackgroundTraining) document.getElementById('black-count').innerText = `x ${blackCount}`;
                 } else {
                     whiteCount++;
-                    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                    if(!isBackgroundTraining) document.getElementById('white-count').innerText = `x ${whiteCount}`;
                 }
             }
             pottedOwnPieceThisTurn = false; 
@@ -404,40 +454,51 @@ Events.on(engine, 'afterUpdate', async () => {
         hitAnyPuckThisTurn = false; 
         piecesPottedThisTurn = []; 
         
-        const turnIndicator = document.getElementById('turn-indicator');
-        if (isSelfPlayTraining) {
-            turnIndicator.innerText = `🤖 訓練模式：AI 運算中... (第 ${totalTurnsThisGame} 桿)`;
-            turnIndicator.style.color = "#f39c12";
-        } else if (currentPlayer === 1) {
-            turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
-            turnIndicator.style.color = "#2ecc71"; // 綠色
-        } else {
-            turnIndicator.innerText = "現在輪到：AI 神經網路 (思考中...)";
-            turnIndicator.style.color = "#e74c3c"; // 紅色
+        // UI 更新 (背景模式下跳過以節省效能)
+        if (!isBackgroundTraining) {
+            const turnIndicator = document.getElementById('turn-indicator');
+            if (isSelfPlayTraining) {
+                turnIndicator.innerText = `🤖 訓練模式：AI 運算中... (第 ${totalTurnsThisGame} 桿)`;
+                turnIndicator.style.color = "#f39c12";
+            } else if (currentPlayer === 1) {
+                turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
+                turnIndicator.style.color = "#2ecc71"; // 綠色
+            } else {
+                turnIndicator.innerText = "現在輪到：AI 神經網路 (思考中...)";
+                turnIndicator.style.color = "#e74c3c"; // 紅色
+            }
         }
 
         const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
 
-        // 死局防護機制
+        // 死局防護機制與重置
         if (blackCount === 0 || whiteCount === 0 || totalTurnsThisGame > 150) {
-            console.log("一局結束，強制存檔並重新載入...");
-            await carromBrain.save();
-            if(isSelfPlayTraining) {
-                window.location.href = window.location.pathname + `?train=true&speed=${currentTrainingSpeed}`;
+            // 背景模式下，這裡只負責存檔與加總
+            if (isBackgroundTraining) {
+                bgTrainingCurrent++;
+                document.getElementById('bg-progress-text').innerText = `已完成: ${bgTrainingCurrent} / ${bgTrainingTarget} 局`;
             } else {
-                window.location.reload();
+                await carromBrain.save();
+            }
+            resetGame(); // 瞬間重置盤面，不用重新整理網頁！
+            
+            // 正常模式重置後繼續觸發下一桿
+            if (!isBackgroundTraining && (isSelfPlayTraining || currentPlayer === 2)) {
+                const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
+                setTimeout(requestLocalAIPrediction, delay);
             }
             return;
         }
 
-        if (currentPlayer === 2 || isSelfPlayTraining) {
+        // 正常繼續下一桿
+        if (!isBackgroundTraining && (currentPlayer === 2 || isSelfPlayTraining)) {
             const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
             setTimeout(requestLocalAIPrediction, delay);
         }
     }
-});
+}
 
 // 8. 自定義繪製
 Events.on(render, 'afterRender', () => {
@@ -568,9 +629,9 @@ Events.on(render, 'afterRender', () => {
 
 document.getElementById('speed-slider').addEventListener('input', (e) => {
     currentTrainingSpeed = parseInt(e.target.value);
-    document.getElementById('speed-label').innerText = `訓練速度: ${currentTrainingSpeed}x`;
+    document.getElementById('speed-label').innerText = `畫面速度: ${currentTrainingSpeed}x`;
     
-    if (isSelfPlayTraining) {
+    if (isSelfPlayTraining && !isBackgroundTraining) {
         engine.timing.timeScale = currentTrainingSpeed;
         engine.positionIterations = 10 + currentTrainingSpeed * 2;
         engine.velocityIterations = 10 + currentTrainingSpeed * 2;
@@ -581,7 +642,7 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
     isSelfPlayTraining = !isSelfPlayTraining;
     const btn = document.getElementById('btn-self-play');
     if(isSelfPlayTraining) {
-        btn.innerText = "🛑 停止 AI 掛機訓練";
+        btn.innerText = "🛑 停止畫面互搏";
         btn.style.backgroundColor = "#c0392b";
         
         engine.timing.timeScale = currentTrainingSpeed; 
@@ -590,7 +651,7 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
         
         requestLocalAIPrediction(); 
     } else {
-        btn.innerText = "🤖 啟動 AI 左右互搏";
+        btn.innerText = "🤖 啟動畫面互搏";
         btn.style.backgroundColor = "#e67e22";
         
         engine.timing.timeScale = 1; 
@@ -609,41 +670,75 @@ document.getElementById('btn-download').addEventListener('click', async () => {
     }
 });
 
-//🔥 新增：刪除 AI 記憶並重新訓練
 document.getElementById('btn-reset-ai').addEventListener('click', async () => {
-    const confirmReset = confirm("確定要刪除 AI 的所有記憶，讓它從頭開始學習嗎？\n\n注意：這會清空儲存在瀏覽器裡的訓練進度！");
+    const confirmReset = confirm("確定要刪除 AI 的所有記憶，讓它從頭開始學習嗎？");
     if (confirmReset) {
-        // 清除本地儲存的訓練狀態
         localStorage.removeItem('carrom-ai-exploration');
-        try {
-            await tf.io.removeModel('localstorage://carrom-ai-model');
-        } catch(e) {
-            console.log("本地沒有神經網路模型可刪除");
-        }
-        
-        // 如果正在訓練中，先停止
-        if (isSelfPlayTraining) {
-            document.getElementById('btn-self-play').click();
-        }
-        
+        try { await tf.io.removeModel('localstorage://carrom-ai-model'); } catch(e) {}
+        if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
         alert("記憶已清除！網頁將重新載入。");
-        // 拿掉網址裡的 train 參數並重整，確保以最乾淨的狀態重新開始
         window.location.href = window.location.pathname;
     }
 });
 
-window.onload = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlSpeed = urlParams.get('speed');
-    if (urlSpeed) {
-        currentTrainingSpeed = parseInt(urlSpeed);
-        document.getElementById('speed-slider').value = currentTrainingSpeed;
-        document.getElementById('speed-label').innerText = `訓練速度: ${currentTrainingSpeed}x`;
+//🔥 新增：啟動背景極速訓練 500 局
+document.getElementById('btn-bg-train').addEventListener('click', async () => {
+    if (isBackgroundTraining) return;
+    isBackgroundTraining = true;
+    bgTrainingTarget = 500;
+    bgTrainingCurrent = 0;
+    
+    // 關閉原本的畫面互搏
+    if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
+
+    // 顯示遮罩、停止渲染與預設引擎迴圈
+    document.getElementById('bg-training-screen').style.display = 'flex';
+    document.querySelector('canvas').style.display = 'none';
+    Render.stop(render);
+    Runner.stop(runner);
+
+    // 大幅提高物理精確度，因為背景運算沒有視覺限制
+    engine.positionIterations = 20;
+    engine.velocityIterations = 20;
+
+    resetGame();
+
+    let ticks = 0;
+    //🔥 核心迴圈：完全脫離 setTimeout，CPU 全速運轉
+    while (bgTrainingCurrent < bgTrainingTarget) {
+        if (!isMoving && !turnActive) {
+            executeAIActionSync();
+        }
+
+        // 手動推進物理時間 (每次推進約 16 毫秒)
+        Engine.update(engine, 16.666);
+        
+        // 手動等待並結算回合
+        await checkTurnEndAsync();
+
+        ticks++;
+        // 每運算 100 幀 (約等於物理世界過了 1.6 秒)，釋放一次主執行緒，避免瀏覽器當機
+        if (ticks % 100 === 0) {
+            await new Promise(r => setTimeout(r, 0)); 
+        }
     }
-    if (urlParams.get('train') === 'true') {
-        document.getElementById('btn-self-play').click();
-    }
-};
+
+    // 訓練結束，存檔並恢復畫面
+    await carromBrain.save();
+    isBackgroundTraining = false;
+    document.getElementById('bg-training-screen').style.display = 'none';
+    document.querySelector('canvas').style.display = 'block';
+    
+    // 恢復正常物理引擎設定並重置
+    engine.positionIterations = 10;
+    engine.velocityIterations = 10;
+    resetGame();
+    Render.run(render);
+    Runner.run(runner, engine);
+
+    alert("⚡ 精神時光屋修煉完成！500 局極速訓練已結束，AI 大腦已存檔！");
+});
+
 
 //🔥 === TensorFlow.js 本機機器學習 AI 大腦 ===
 
@@ -749,14 +844,17 @@ class CarromBrain {
             this.explorationRate *= this.explorationDecay;
         }
 
-        document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (上次獎勵: ${reward})`;
+        if(!isBackgroundTraining) {
+            document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (上次獎勵: ${reward})`;
+        }
     }
 }
 
 const carromBrain = new CarromBrain();
 carromBrain.init(); 
 
-function requestLocalAIPrediction() {
+//🔥 新增：同步執行 AI 動作 (完全去除 setTimeout，專為背景極速模式打造)
+function executeAIActionSync() {
     lastAIState = carromBrain.getStateArray();
     const rawAction = carromBrain.predict(lastAIState);
     lastAIAction = rawAction;
@@ -778,14 +876,17 @@ function requestLocalAIPrediction() {
     Body.setVelocity(striker, { x: 0, y: 0 });
 
     hitAnyPuckThisTurn = false;
+    
+    const forceVector = { x: aiForceX, y: aiForceY };
+    Body.applyForce(striker, striker.position, forceVector);
+    
+    turnActive = true;
+}
 
+// 正常畫面的 AI 預測呼叫 (保有視覺延遲)
+function requestLocalAIPrediction() {
     const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
     setTimeout(() => {
-        const forceVector = { x: aiForceX, y: aiForceY };
-        Body.applyForce(striker, striker.position, forceVector);
-        
-        setTimeout(() => {
-            turnActive = true;
-        }, isSelfPlayTraining ? 10 : 50); 
+        executeAIActionSync();
     }, delay);
 }
