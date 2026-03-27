@@ -148,7 +148,7 @@ let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
 let piecesPottedThisTurn = []; 
 
-//🔥 用於機器學習的狀態追蹤
+// 用於機器學習的狀態追蹤
 let lastAIState = null;
 let lastAIAction = null;
 
@@ -321,7 +321,7 @@ Events.on(engine, 'afterUpdate', async () => {
             }
         }
 
-        //🔥 強化學習獎勵結算 (Reward Calculation)
+        // 強化學習獎勵結算 (Reward Calculation)
         if (currentPlayer === 2 && lastAIState && lastAIAction) {
             let reward = -0.1; // 基礎懲罰，逼迫 AI 趕快進球
             if (pottedOwnPieceThisTurn) reward += 10.0; // 打進自己的白球，大獎勵！
@@ -393,7 +393,7 @@ Events.on(engine, 'afterUpdate', async () => {
         Body.setVelocity(striker, { x: 0, y: 0 });
 
         if (currentPlayer === 2) {
-            //🔥 呼叫本機的 TensorFlow 神經網路進行打擊
+            // 呼叫本機的 TensorFlow 神經網路進行打擊
             requestLocalAIPrediction();
         }
     }
@@ -528,15 +528,38 @@ Events.on(render, 'afterRender', () => {
 
 class CarromBrain {
     constructor() {
-        this.model = tf.sequential();
-        
-        // 輸入層：19 顆棋子 * 2 (x,y 座標) = 38 個特徵
-        this.model.add(tf.layers.dense({ units: 64, inputShape: [38], activation: 'relu' }));
-        this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
-        
-        // 輸出層：3 個數值 (strikerX, forceX, forceY)
-        // 使用 tanh 讓輸出介於 -1 到 1 之間
-        this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
+        this.explorationRate = 1.0; // 初始探索率 (100% 隨機嘗試)
+        this.explorationDecay = 0.995; // 每次打擊後慢慢降低隨機性
+        this.minExploration = 0.05; // 至少保留 5% 的隨機性來尋找新打法
+        this.isInitialized = false; // 標記是否已經準備好
+    }
+
+    //🔥 新增：啟動時嘗試讀取先前的記憶
+    async init() {
+        try {
+            // 嘗試從瀏覽器的 LocalStorage 讀取已儲存的腦部神經網路
+            this.model = await tf.loadLayersModel('localstorage://carrom-ai-model');
+            console.log('成功載入先前的 AI 記憶！');
+            
+            // 讀取上次存檔的探索率 (讓它記得自己學到哪裡了)
+            const savedRate = localStorage.getItem('carrom-ai-exploration');
+            if (savedRate !== null) {
+                this.explorationRate = parseFloat(savedRate);
+            }
+            
+            document.getElementById('ml-status').innerText = `AI 記憶載入成功！目前探索率: ${Math.round(this.explorationRate * 100)}%`;
+        } catch (e) {
+            console.log('找不到舊記憶，建立全新 AI 大腦...');
+            this.model = tf.sequential();
+            
+            // 輸入層：19 顆棋子 * 2 (x,y 座標) = 38 個特徵
+            this.model.add(tf.layers.dense({ units: 64, inputShape: [38], activation: 'relu' }));
+            this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
+            
+            // 輸出層：3 個數值 (strikerX, forceX, forceY)
+            // 使用 tanh 讓輸出介於 -1 到 1 之間
+            this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
+        }
         
         // 編譯神經網路
         this.model.compile({
@@ -544,9 +567,14 @@ class CarromBrain {
             loss: 'meanSquaredError'
         });
 
-        this.explorationRate = 1.0; // 初始探索率 (100% 隨機嘗試)
-        this.explorationDecay = 0.995; // 每次打擊後慢慢降低隨機性
-        this.minExploration = 0.05; // 至少保留 5% 的隨機性來尋找新打法
+        this.isInitialized = true;
+    }
+
+    //🔥 新增：自動將記憶存入平板瀏覽器
+    async save() {
+        if (!this.isInitialized) return;
+        await this.model.save('localstorage://carrom-ai-model');
+        localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
     }
 
     // 將物理盤面轉換成神經網路看得懂的 38 維陣列
@@ -570,6 +598,8 @@ class CarromBrain {
 
     // 進行預測或隨機探索
     predict(stateArray) {
+        if (!this.isInitialized) return [0, 0, 0]; // 安全防護
+
         // 如果擲骰子小於探索率，就大膽隨機嘗試 (Exploration)
         if (Math.random() < this.explorationRate) {
             return [
@@ -589,6 +619,8 @@ class CarromBrain {
 
     // 根據獎勵調整神經網路權重
     async train(stateArray, actionTaken, reward) {
+        if (!this.isInitialized) return;
+
         // 建立一組期望的目標輸出。如果得到正獎勵，就更鼓勵這個動作；負獎勵則遠離
         const targetAction = actionTaken.map(a => {
             // 簡單的 Policy Gradient 近似概念
@@ -611,11 +643,15 @@ class CarromBrain {
 
         // 更新 UI 狀態
         document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (上次獎勵: ${reward})`;
+
+        //🔥 每次訓練完畢後，強制自動存檔！
+        await this.save();
     }
 }
 
 // 初始化神經網路大腦
 const carromBrain = new CarromBrain();
+carromBrain.init(); //🔥 程式啟動時立刻執行記憶載入
 
 // 呼叫本機 AI 進行推論並執行
 function requestLocalAIPrediction() {
