@@ -13,7 +13,7 @@
         
         #turn-indicator { font-size: 18px; font-weight: bold; margin-bottom: 15px !important; color: #2ecc71; }
         
-        /* 新增：ML 訓練狀態顯示器 */
+        /* ML 訓練狀態顯示器 */
         #ml-status { font-size: 12px; color: #3498db; margin-top: 10px; }
 
         /* 右側計分板樣式 */
@@ -24,6 +24,14 @@
         .piece-icon::before { content: ''; position: absolute; top: 3px; left: 3px; width: 8px; height: 8px; border-radius: 50%; border-top: 2px solid rgba(255,255,255,0.4); border-left: 2px solid rgba(255,255,255,0.4); transform: rotate(-15deg); }
         .black-icon { background-color: #2c3e50; border: 1px solid #95a5a6; }
         .white-icon { background-color: #ecf0f1; border: 1px solid #95a5a6; color: #2c3e50; }
+        
+        /* 訓練控制面板 (掛機訓練與打包匯出用) */
+        #ml-controls { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; z-index: 100; }
+        #ml-controls button { padding: 10px 15px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        #btn-self-play { background-color: #e67e22; color: white; }
+        #btn-self-play:active { background-color: #d35400; }
+        #btn-download { background-color: #3498db; color: white; }
+        #btn-download:active { background-color: #2980b9; }
     </style>
 </head>
 <body>
@@ -44,6 +52,11 @@
             <div class="piece-icon white-icon"></div>
             <span id="white-count">x 9</span>
         </div>
+    </div>
+    
+    <div id="ml-controls">
+        <button id="btn-self-play">🤖 啟動 AI 左右互搏 (加速訓練)</button>
+        <button id="btn-download">💾 匯出打包 AI 大腦</button>
     </div>
     
     <script src="/socket.io/socket.io.js"></script> 
