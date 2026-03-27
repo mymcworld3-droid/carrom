@@ -496,9 +496,11 @@ async function checkTurnEndAsync() {
             if (isBackgroundTraining) {
                 bgTrainingCurrent++;
                 document.getElementById('bg-progress-text').innerText = `已完成: ${bgTrainingCurrent} / ${bgTrainingTarget} 局`;
-            } else {
-                await carromBrain.save();
             }
+            
+            //🔥 不論是否在閉關，每一局結束都強制存檔 (海馬迴與神經網路)，確保進度滴水不漏
+            await carromBrain.save();
+            
             resetGame(); 
             
             if (!isBackgroundTraining && (isSelfPlayTraining || currentPlayer === 2)) {
@@ -654,7 +656,7 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
         btn.style.backgroundColor = "#c0392b";
         requestLocalAIPrediction(); 
     } else {
-        btn.innerText = "🤖 啟掌握面互搏";
+        btn.innerText = "🤖 啟動畫面互搏";
         btn.style.backgroundColor = "#e67e22";
     }
 });
@@ -673,7 +675,6 @@ document.getElementById('btn-reset-ai').addEventListener('click', async () => {
     const confirmReset = confirm("確定要刪除 AI 的所有記憶，讓它從頭開始學習嗎？");
     if (confirmReset) {
         localStorage.removeItem('carrom-ai-exploration');
-        //🔥 同步刪除被存入 LocalStorage 的海馬迴記憶
         localStorage.removeItem('carrom-ai-memory'); 
         try { await tf.io.removeModel('localstorage://carrom-ai-model'); } catch(e) {}
         if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
@@ -748,7 +749,6 @@ class CarromBrain {
                     this.explorationRate = parseFloat(savedRate);
                 }
 
-                //🔥 讀取經驗回放記憶庫 (海馬迴)
                 const savedMemory = localStorage.getItem('carrom-ai-memory');
                 if (savedMemory !== null) {
                     this.memory = JSON.parse(savedMemory);
@@ -779,7 +779,6 @@ class CarromBrain {
         await this.model.save('localstorage://carrom-ai-model');
         localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
         
-        //🔥 將最新的 1000 筆海馬迴經驗存入 LocalStorage (避免容量超過瀏覽器 5MB 限制)
         try {
             const memoryToSave = this.memory.slice(-1000); 
             localStorage.setItem('carrom-ai-memory', JSON.stringify(memoryToSave));
