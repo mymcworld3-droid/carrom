@@ -153,6 +153,7 @@ let lastAIState = null;
 let lastAIAction = null;
 let isSelfPlayTraining = false; // 是否開啟 AI 左右互搏模式
 let totalTurnsThisGame = 0; // 記錄打了幾桿，避免死局
+let currentTrainingSpeed = 10; //🔥 記錄當前使用者設定的訓練速度
 
 // 5. 處理嚴格進洞邏輯
 Events.on(engine, 'afterUpdate', () => {
@@ -384,7 +385,7 @@ Events.on(engine, 'afterUpdate', async () => {
         
         const turnIndicator = document.getElementById('turn-indicator');
         if (isSelfPlayTraining) {
-            turnIndicator.innerText = `🤖 訓練模式：AI 10倍速運算中... (第 ${totalTurnsThisGame} 桿)`;
+            turnIndicator.innerText = `🤖 訓練模式：AI 運算中... (第 ${totalTurnsThisGame} 桿)`;
             turnIndicator.style.color = "#f39c12";
         } else if (currentPlayer === 1) {
             turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
@@ -404,7 +405,7 @@ Events.on(engine, 'afterUpdate', async () => {
             await carromBrain.save();
             // 在網址後方加上參數，讓網頁重整後能自動接續訓練模式
             if(isSelfPlayTraining) {
-                window.location.href = window.location.pathname + "?train=true";
+                window.location.href = window.location.pathname + `?train=true&speed=${currentTrainingSpeed}`;
             } else {
                 window.location.reload();
             }
@@ -412,8 +413,8 @@ Events.on(engine, 'afterUpdate', async () => {
         }
 
         if (currentPlayer === 2 || isSelfPlayTraining) {
-            //🔥 訓練模式下，拔除等待時間，全速出桿
-            const delay = isSelfPlayTraining ? 10 : 500;
+            //🔥 根據使用者設定的速度動態縮短延遲時間，避免發呆
+            const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
             setTimeout(requestLocalAIPrediction, delay);
         }
     }
@@ -544,28 +545,41 @@ Events.on(render, 'afterRender', () => {
     }
 });
 
-//🔥 === UI 按鈕控制邏輯 (包含 10 倍速核心) ===
+//🔥 === UI 按鈕與速度控制邏輯 ===
+
+// 監聽速度調整拉桿
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+    currentTrainingSpeed = parseInt(e.target.value);
+    document.getElementById('speed-label').innerText = `訓練速度: ${currentTrainingSpeed}x`;
+    
+    // 如果正在訓練中，即時套用新速度與防穿牆精度
+    if (isSelfPlayTraining) {
+        engine.timing.timeScale = currentTrainingSpeed;
+        // 動態增強物理精確度：速度越快，需要的計算次數越多才不會穿牆消失
+        engine.positionIterations = 10 + currentTrainingSpeed * 2;
+        engine.velocityIterations = 10 + currentTrainingSpeed * 2;
+    }
+});
 
 // 啟動自我訓練模式
 document.getElementById('btn-self-play').addEventListener('click', () => {
     isSelfPlayTraining = !isSelfPlayTraining;
     const btn = document.getElementById('btn-self-play');
     if(isSelfPlayTraining) {
-        btn.innerText = "🛑 停止 AI 掛機訓練 (10倍速進行中)";
+        btn.innerText = "🛑 停止 AI 掛機訓練";
         btn.style.backgroundColor = "#c0392b";
         
-        //🔥 啟動 10 倍速物理引擎
-        engine.timing.timeScale = 10; 
-        // 增加碰撞運算迭代次數，避免 10 倍速導致球體穿牆 Bug
-        engine.positionIterations = 20; 
-        engine.velocityIterations = 20;
+        // 啟動加速物理引擎與防穿牆精確度
+        engine.timing.timeScale = currentTrainingSpeed; 
+        engine.positionIterations = 10 + currentTrainingSpeed * 2; 
+        engine.velocityIterations = 10 + currentTrainingSpeed * 2;
         
         requestLocalAIPrediction(); // 立刻啟動
     } else {
-        btn.innerText = "🤖 啟動 AI 左右互搏 (加速訓練)";
+        btn.innerText = "🤖 啟動 AI 左右互搏";
         btn.style.backgroundColor = "#e67e22";
         
-        // 恢復正常速度
+        // 恢復人類正常速度
         engine.timing.timeScale = 1; 
         engine.positionIterations = 10; 
         engine.velocityIterations = 10;
@@ -576,7 +590,6 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
 document.getElementById('btn-download').addEventListener('click', async () => {
     if (!carromBrain.isInitialized) return;
     try {
-        // 下載會產生兩個檔案 (model.json 與 weights.bin)
         await carromBrain.model.save('downloads://carrom-ai-model');
         alert("下載成功！\n\n請將下載的兩個檔案 (carrom-ai-model.json 和 weights.bin) 放到專案的 public 目錄中。\n未來任何人開啟遊戲，都會自動讀取這個最強大腦！");
     } catch (e) {
@@ -584,9 +597,15 @@ document.getElementById('btn-download').addEventListener('click', async () => {
     }
 });
 
-// 檢查網址，決定是否一開網頁就自動接續訓練
+// 檢查網址，決定是否一開網頁就自動接續訓練，並恢復速度
 window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
+    const urlSpeed = urlParams.get('speed');
+    if (urlSpeed) {
+        currentTrainingSpeed = parseInt(urlSpeed);
+        document.getElementById('speed-slider').value = currentTrainingSpeed;
+        document.getElementById('speed-label').innerText = `訓練速度: ${currentTrainingSpeed}x`;
+    }
     if (urlParams.get('train') === 'true') {
         document.getElementById('btn-self-play').click();
     }
@@ -745,8 +764,8 @@ function requestLocalAIPrediction() {
     Body.setPosition(striker, { x: aiX, y: aiStrikerY });
     Body.setVelocity(striker, { x: 0, y: 0 });
 
-    //🔥 訓練模式下，拔除等待時間，全速出桿
-    const delay = isSelfPlayTraining ? 10 : 500;
+    // 訓練模式下，根據速度動態縮短延遲出桿
+    const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
     setTimeout(() => {
         const forceVector = { x: aiForceX, y: aiForceY };
         Body.applyForce(striker, striker.position, forceVector);
