@@ -671,13 +671,19 @@ document.getElementById('btn-reset-ai').addEventListener('click', async () => {
 document.getElementById('btn-bg-train').addEventListener('click', async () => {
     if (isBackgroundTraining) return;
     isBackgroundTraining = true;
-    bgTrainingTarget = 50;
+    
+    //🔥 讀取輸入框的數字作為目標，如果沒輸入則預設給 50
+    const userInput = parseInt(document.getElementById('bg-target-input').value);
+    bgTrainingTarget = isNaN(userInput) || userInput <= 0 ? 50 : userInput;
     bgTrainingCurrent = 0;
     
     if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
 
     document.getElementById('bg-training-screen').style.display = 'flex';
     document.querySelector('canvas').style.display = 'none';
+    
+    //🔥 動態更新遮罩畫面的進度文字
+    document.getElementById('bg-progress-text').innerText = `已完成: 0 / ${bgTrainingTarget} 局`;
 
     resetGame();
 
@@ -705,7 +711,8 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
     document.querySelector('canvas').style.display = 'block';
     
     resetGame();
-    alert("⚡ 精神時光屋修煉完成！50 局極速訓練已結束，AI 大腦已存檔！");
+    //🔥 訓練完成跳窗也改為動態顯示局數
+    alert(`⚡ 精神時光屋修煉完成！${bgTrainingTarget} 局極速訓練已結束，AI 大腦已存檔！`);
 });
 
 
