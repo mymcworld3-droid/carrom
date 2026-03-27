@@ -29,7 +29,7 @@ const render = Render.create({
     }
 });
 
-//🔥 移除內建的 Runner，因為我們等一下要在最底部手寫「完美加速迴圈」
+// 移除內建的 Runner，因為我們等一下要在最底部手寫「完美加速迴圈」
 
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
 const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 };
@@ -147,7 +147,7 @@ let lastAIState = null;
 let lastAIAction = null;
 let isSelfPlayTraining = false; 
 let totalTurnsThisGame = 0; 
-let consecutiveMisses = 0; //🔥 新增：追蹤連續空杆次數
+let consecutiveMisses = 0; 
 let currentTrainingSpeed = 10; 
 let isBackgroundTraining = false;
 let bgTrainingTarget = 0;
@@ -320,7 +320,7 @@ function resetGame() {
     whiteCount = 9;
     currentPlayer = 1;
     totalTurnsThisGame = 0;
-    consecutiveMisses = 0; //🔥 重置時歸零空杆次數
+    consecutiveMisses = 0; 
     turnActive = false;
     isMoving = false;
     hitAnyPuckThisTurn = false;
@@ -373,17 +373,22 @@ async function checkTurnEndAsync() {
         totalTurnsThisGame++; 
         
         let isFoulQueen = false;
+        let isGameWon = false; //🔥 新增：遊戲獲勝旗籤
+        
+        const ownRemaining = currentPlayer === 1 ? blackCount : whiteCount;
+        
+        //🔥 判斷皇后的打擊是否合法
         if (pottedQueenThisTurn) {
-            const ownRemaining = currentPlayer === 1 ? blackCount : whiteCount;
             if (ownRemaining > 0) {
-                isFoulQueen = true;
+                isFoulQueen = true; // 還有自己的球卻打進皇后，犯規！
+            } else {
+                isGameWon = true;   // 自己的球打完後打進皇后，獲勝！
             }
         }
 
         let isFoulMiss = !hitAnyPuckThisTurn;
         let isFoul = isFoulQueen || pottedStrikerThisTurn || isFoulMiss;
 
-        //🔥 迴圈破除機制：記錄連續空杆
         if (isFoulMiss) {
             consecutiveMisses++;
         } else {
@@ -395,16 +400,22 @@ async function checkTurnEndAsync() {
             let reward = -0.1; 
             if (pottedOwnPieceThisTurn) reward += 10.0; 
             if (pottedStrikerThisTurn) reward -= 10.0; 
-            if (isFoulQueen) reward -= 10.0; 
+            
+            //🔥 更新皇后相關的學習獎勵
+            if (pottedQueenThisTurn) {
+                if (ownRemaining > 0) {
+                    reward -= 20.0; // 提早打進皇后，扣除大分教訓 AI
+                } else {
+                    reward += 100.0; // 完美絕殺獲勝，給予破表大獎勵！
+                }
+            }
             
             if (isFoulMiss) {
                 reward -= 5.0;  
-                //🔥 當 AI 陷入死迴圈 (連續 4 次空杆)，給予毀滅性懲罰並強制一巴掌打醒它
                 if (consecutiveMisses >= 4) {
                     reward -= 50.0; 
-                    // 強制拉高探索率，逼它下一次隨機亂打找新出路
                     carromBrain.explorationRate = Math.max(carromBrain.explorationRate, 0.8); 
-                    consecutiveMisses = 0; // 打醒後重新計數
+                    consecutiveMisses = 0; 
                 }
             }
             
@@ -413,8 +424,15 @@ async function checkTurnEndAsync() {
 
         if (isFoul) {
             piecesPottedThisTurn.forEach(p => {
-                const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
-                const ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
+                //🔥 如果是皇后犯規進洞，將它嚴格擺回棋盤正中央
+                let rx = WIDTH/2 + (Math.random() - 0.5) * 40;
+                let ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
+                
+                if (p.render.fillStyle === colorQueen) {
+                    rx = WIDTH / 2;
+                    ry = HEIGHT / 2;
+                }
+
                 Body.setPosition(p, { x: rx, y: ry });
                 Body.setVelocity(p, { x: 0, y: 0 });
 
@@ -447,7 +465,8 @@ async function checkTurnEndAsync() {
             pottedOwnPieceThisTurn = false; 
         }
 
-        const keepTurn = pottedOwnPieceThisTurn && !isFoul;
+        //🔥 更新球權保留規則：進自己的球「或」合法打進皇后，即可繼續打
+        const keepTurn = (pottedOwnPieceThisTurn || isGameWon) && !isFoul;
 
         if (!keepTurn) {
             currentPlayer = currentPlayer === 1 ? 2 : 1;
@@ -477,7 +496,8 @@ async function checkTurnEndAsync() {
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
 
-        if (blackCount === 0 || whiteCount === 0 || totalTurnsThisGame > 150) {
+        //🔥 修改重置條件：當有一方真的達成獲勝條件 (打完球且打進皇后)，才重置盤面
+        if (isGameWon || totalTurnsThisGame > 150) {
             if (isBackgroundTraining) {
                 bgTrainingCurrent++;
                 document.getElementById('bg-progress-text').innerText = `已完成: ${bgTrainingCurrent} / ${bgTrainingTarget} 局`;
@@ -684,7 +704,6 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
             executeAIActionSync();
         }
 
-        // 永遠使用完美的 16.666ms 推進物理引擎，確保背景極速訓練時摩擦力不失效
         Engine.update(engine, 16.666);
         await checkTurnEndAsync();
 
@@ -788,8 +807,18 @@ class CarromBrain {
 
     getExpertAction() {
         const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
-        const myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
+        let myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
         
+        //🔥 如果自己的球打完了，唯一且必殺的目標就變成皇后！
+        if (myPucks.length === 0) {
+            const queen = pucks.find(p => p.render.fillStyle === colorQueen && p.position.x !== -100);
+            if (queen) {
+                myPucks = [queen];
+            } else {
+                return [0, 0, 0]; // 皇后若已消失代表遊戲該結束了
+            }
+        }
+
         if (myPucks.length === 0) return [0, 0, 0];
 
         const pocketY = currentPlayer === 1 ? 30 : HEIGHT - 30;
@@ -846,8 +875,6 @@ class CarromBrain {
             const prediction = this.model.predict(inputTensor);
             const data = prediction.dataSync();
             
-            //🔥 預防性手抖：加入 2% 的微小雜訊。
-            // 確保即使盤面完全沒變，每一次打出去的角度與力道也會有毫米級的差異，徹底消滅死迴圈。
             return [
                 data[0] + (Math.random() * 0.04 - 0.02),
                 data[1] + (Math.random() * 0.04 - 0.02),
@@ -938,17 +965,15 @@ function requestLocalAIPrediction() {
     }, delay);
 }
 
-//🔥 終極物理核心：自定義主迴圈 (取代預設 Runner，完美解決摩擦力失效問題)
 async function customGameLoop() {
     if (!isBackgroundTraining) {
         const steps = isSelfPlayTraining ? currentTrainingSpeed : 1;
         for (let i = 0; i < steps; i++) {
-            Engine.update(engine, 16.666); // 永遠使用標準時間步長，保證完美摩擦力與碰撞
+            Engine.update(engine, 16.666); 
             await checkTurnEndAsync();
         }
         Render.world(render); 
     }
     window.requestAnimationFrame(customGameLoop);
 }
-// 啟動我們的專屬神級迴圈
 customGameLoop();
