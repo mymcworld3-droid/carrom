@@ -147,6 +147,7 @@ let lastAIState = null;
 let lastAIAction = null;
 let isSelfPlayTraining = false; 
 let totalTurnsThisGame = 0; 
+let consecutiveMisses = 0; //🔥 新增：追蹤連續空杆次數
 let currentTrainingSpeed = 10; 
 let isBackgroundTraining = false;
 let bgTrainingTarget = 0;
@@ -319,6 +320,7 @@ function resetGame() {
     whiteCount = 9;
     currentPlayer = 1;
     totalTurnsThisGame = 0;
+    consecutiveMisses = 0; //🔥 重置時歸零空杆次數
     turnActive = false;
     isMoving = false;
     hitAnyPuckThisTurn = false;
@@ -381,13 +383,30 @@ async function checkTurnEndAsync() {
         let isFoulMiss = !hitAnyPuckThisTurn;
         let isFoul = isFoulQueen || pottedStrikerThisTurn || isFoulMiss;
 
+        //🔥 迴圈破除機制：記錄連續空杆
+        if (isFoulMiss) {
+            consecutiveMisses++;
+        } else {
+            consecutiveMisses = 0;
+        }
+
         // 強化學習獎勵結算
         if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && lastAIState && lastAIAction) {
             let reward = -0.1; 
             if (pottedOwnPieceThisTurn) reward += 10.0; 
             if (pottedStrikerThisTurn) reward -= 10.0; 
             if (isFoulQueen) reward -= 10.0; 
-            if (isFoulMiss) reward -= 5.0;  
+            
+            if (isFoulMiss) {
+                reward -= 5.0;  
+                //🔥 當 AI 陷入死迴圈 (連續 4 次空杆)，給予毀滅性懲罰並強制一巴掌打醒它
+                if (consecutiveMisses >= 4) {
+                    reward -= 50.0; 
+                    // 強制拉高探索率，逼它下一次隨機亂打找新出路
+                    carromBrain.explorationRate = Math.max(carromBrain.explorationRate, 0.8); 
+                    consecutiveMisses = 0; // 打醒後重新計數
+                }
+            }
             
             await carromBrain.rememberAndTrain(lastAIState, lastAIAction, reward);
         }
@@ -610,7 +629,6 @@ Events.on(render, 'afterRender', () => {
 document.getElementById('speed-slider').addEventListener('input', (e) => {
     currentTrainingSpeed = parseInt(e.target.value);
     document.getElementById('speed-label').innerText = `畫面速度: ${currentTrainingSpeed}x`;
-    //🔥 不再修改 timeScale，保證物理摩擦力絕對精準
 });
 
 document.getElementById('btn-self-play').addEventListener('click', () => {
@@ -826,7 +844,15 @@ class CarromBrain {
         return tf.tidy(() => {
             const inputTensor = tf.tensor2d([stateArray]);
             const prediction = this.model.predict(inputTensor);
-            return prediction.dataSync();
+            const data = prediction.dataSync();
+            
+            //🔥 預防性手抖：加入 2% 的微小雜訊。
+            // 確保即使盤面完全沒變，每一次打出去的角度與力道也會有毫米級的差異，徹底消滅死迴圈。
+            return [
+                data[0] + (Math.random() * 0.04 - 0.02),
+                data[1] + (Math.random() * 0.04 - 0.02),
+                data[2] + (Math.random() * 0.04 - 0.02)
+            ].map(v => Math.max(-1, Math.min(1, v)));
         });
     }
 
