@@ -29,9 +29,7 @@ const render = Render.create({
     }
 });
 
-Render.run(render);
-const runner = Runner.create();
-Runner.run(runner, engine);
+//🔥 移除內建的 Runner，因為我們等一下要在最底部手寫「完美加速迴圈」
 
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
 const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 };
@@ -64,7 +62,7 @@ const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, {
     frictionAir: 0.008, 
     friction: 0.01,     
     mass: 15, 
-    isBullet: true, // 絕對防止母球高速穿牆
+    isBullet: true, 
     render: { 
         visible: false, 
         fillStyle: colorStriker, 
@@ -86,7 +84,7 @@ const puckOptions = {
     frictionAir: 0.004, 
     friction: 0.01,     
     mass: 5,
-    isBullet: true // 防止子球被撞飛出界
+    isBullet: true 
 };
 
 // 中心皇后
@@ -231,10 +229,6 @@ Events.on(engine, 'afterUpdate', () => {
             Body.setVelocity(striker, { x: 0, y: 0 });
         }
     });
-
-    if (!isBackgroundTraining) {
-        checkTurnEndAsync();
-    }
 });
 
 // 6. 互動邏輯
@@ -334,8 +328,10 @@ function resetGame() {
     piecesPottedThisTurn = [];
     potEffects = [];
 
-    document.getElementById('black-count').innerText = `x ${blackCount}`;
-    document.getElementById('white-count').innerText = `x ${whiteCount}`;
+    if (!isBackgroundTraining) {
+        document.getElementById('black-count').innerText = `x ${blackCount}`;
+        document.getElementById('white-count').innerText = `x ${whiteCount}`;
+    }
 
     const queen = pucks.find(p => p.id === 100);
     Body.setPosition(queen, { x: cx, y: cy });
@@ -387,13 +383,12 @@ async function checkTurnEndAsync() {
 
         // 強化學習獎勵結算
         if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && lastAIState && lastAIAction) {
-            let reward = -0.1; // 基礎懲罰
-            if (pottedOwnPieceThisTurn) reward += 10.0; // 打進自己的球
-            if (pottedStrikerThisTurn) reward -= 10.0; // 洗澡
-            if (isFoulQueen) reward -= 10.0; // 違規打進皇后
-            if (isFoulMiss) reward -= 5.0;  // 空杆
+            let reward = -0.1; 
+            if (pottedOwnPieceThisTurn) reward += 10.0; 
+            if (pottedStrikerThisTurn) reward -= 10.0; 
+            if (isFoulQueen) reward -= 10.0; 
+            if (isFoulMiss) reward -= 5.0;  
             
-            // 提交給記憶庫並訓練
             await carromBrain.rememberAndTrain(lastAIState, lastAIAction, reward);
         }
 
@@ -615,12 +610,7 @@ Events.on(render, 'afterRender', () => {
 document.getElementById('speed-slider').addEventListener('input', (e) => {
     currentTrainingSpeed = parseInt(e.target.value);
     document.getElementById('speed-label').innerText = `畫面速度: ${currentTrainingSpeed}x`;
-    
-    if (isSelfPlayTraining && !isBackgroundTraining) {
-        engine.timing.timeScale = currentTrainingSpeed;
-        engine.positionIterations = 10 + currentTrainingSpeed * 2;
-        engine.velocityIterations = 10 + currentTrainingSpeed * 2;
-    }
+    //🔥 不再修改 timeScale，保證物理摩擦力絕對精準
 });
 
 document.getElementById('btn-self-play').addEventListener('click', () => {
@@ -629,19 +619,10 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
     if(isSelfPlayTraining) {
         btn.innerText = "🛑 停止畫面互搏";
         btn.style.backgroundColor = "#c0392b";
-        
-        engine.timing.timeScale = currentTrainingSpeed; 
-        engine.positionIterations = 10 + currentTrainingSpeed * 2; 
-        engine.velocityIterations = 10 + currentTrainingSpeed * 2;
-        
         requestLocalAIPrediction(); 
     } else {
         btn.innerText = "🤖 啟動畫面互搏";
         btn.style.backgroundColor = "#e67e22";
-        
-        engine.timing.timeScale = 1; 
-        engine.positionIterations = 10; 
-        engine.velocityIterations = 10;
     }
 });
 
@@ -649,7 +630,7 @@ document.getElementById('btn-download').addEventListener('click', async () => {
     if (!carromBrain.isInitialized) return;
     try {
         await carromBrain.model.save('downloads://carrom-ai-model');
-        alert("下載成功！\n\n請將下載的兩個檔案 (carrom-ai-model.json 和 weights.bin) 放到專案的 public 目錄中。\n未來任何人開啟遊戲，都會自動讀取這個最強大腦！");
+        alert("下載成功！\n\n請將下載的兩個檔案放到專案的 public 目錄中。");
     } catch (e) {
         alert("下載失敗：" + e.message);
     }
@@ -676,11 +657,6 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
 
     document.getElementById('bg-training-screen').style.display = 'flex';
     document.querySelector('canvas').style.display = 'none';
-    Render.stop(render);
-    Runner.stop(runner);
-
-    engine.positionIterations = 20;
-    engine.velocityIterations = 20;
 
     resetGame();
 
@@ -690,6 +666,7 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
             executeAIActionSync();
         }
 
+        // 永遠使用完美的 16.666ms 推進物理引擎，確保背景極速訓練時摩擦力不失效
         Engine.update(engine, 16.666);
         await checkTurnEndAsync();
 
@@ -704,27 +681,18 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
     document.getElementById('bg-training-screen').style.display = 'none';
     document.querySelector('canvas').style.display = 'block';
     
-    engine.positionIterations = 10;
-    engine.velocityIterations = 10;
     resetGame();
-    Render.run(render);
-    Runner.run(runner, engine);
-
     alert("⚡ 精神時光屋修煉完成！500 局極速訓練已結束，AI 大腦已存檔！");
 });
 
 
-//🔥 === TensorFlow.js 終極神經網路 (完整版) ===
-
+// TensorFlow.js 神經網路大腦
 class CarromBrain {
     constructor() {
         this.explorationRate = 1.0; 
         this.explorationDecay = 0.995; 
         this.minExploration = 0.05; 
         this.isInitialized = false; 
-        
-        //🔥 1. 經驗回放記憶庫 (Experience Replay Buffer)
-        // 解決神經網路「學了就忘」的健忘症
         this.memory = [];
         this.maxMemory = 2000;
         this.batchSize = 32;
@@ -750,7 +718,6 @@ class CarromBrain {
                 console.log('找不到舊記憶，建立全新 AI 大腦...');
                 this.model = tf.sequential();
                 
-                // 39 維：皇后(2) + 目標球(18) + 障礙球(18) + 玩家(1)
                 this.model.add(tf.layers.dense({ units: 64, inputShape: [39], activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
@@ -771,7 +738,6 @@ class CarromBrain {
         localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
     }
 
-    // 視角轉換特徵工程：將棋盤整理成 AI 最容易理解的樣子
     getStateArray() {
         const state = [];
         const queen = pucks.find(p => p.render.fillStyle === colorQueen);
@@ -802,15 +768,12 @@ class CarromBrain {
         return state;
     }
 
-    //🔥 2. 專家導師系統 (Math Radar)
-    // 算出完美幾何角度，帶領 AI 快速學會打球
     getExpertAction() {
         const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
         const myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
         
-        if (myPucks.length === 0) return [0, 0, 0]; // 沒球可打
+        if (myPucks.length === 0) return [0, 0, 0];
 
-        // 目標球洞
         const pocketY = currentPlayer === 1 ? 30 : HEIGHT - 30;
         const leftPocket = {x: 30, y: pocketY};
         const rightPocket = {x: WIDTH - 30, y: pocketY};
@@ -819,7 +782,6 @@ class CarromBrain {
         let minDist = 99999;
         let targetPocket = leftPocket;
 
-        // 找出離洞口最近的球
         myPucks.forEach(p => {
             const dLeft = Vector.magnitude(Vector.sub(p.position, leftPocket));
             const dRight = Vector.magnitude(Vector.sub(p.position, rightPocket));
@@ -827,21 +789,18 @@ class CarromBrain {
             if (dRight < minDist) { minDist = dRight; bestPuck = p; targetPocket = rightPocket; }
         });
 
-        // 計算切角位置
         const dx = targetPocket.x - bestPuck.position.x;
-        const offset = dx > 0 ? -12 : 12; // 打對面才能把球擠進洞裡
+        const offset = dx > 0 ? -12 : 12; 
         let idealStrikerX = bestPuck.position.x + offset;
         idealStrikerX = Math.max(120, Math.min(480, idealStrikerX));
 
         const forceX = dx > 0 ? 0.3 : -0.3;
-        const forceY = 0.6; // 固定往前推
+        const forceY = 0.6; 
 
-        // 轉換回神經網路的 [-1, 1] 輸出格式
         const nnX = ((idealStrikerX - 120) / (480 - 120)) * 2 - 1;
         const nnForceX = forceX / 0.8;
         const nnForceY = ((forceY - 0.01) / 0.79) * 2 - 1;
 
-        // 加入些微隨機雜訊，讓 AI 學會應付不同狀況，而不是死背
         return [
             nnX + (Math.random() * 0.2 - 0.1),
             nnForceX + (Math.random() * 0.2 - 0.1),
@@ -852,9 +811,7 @@ class CarromBrain {
     predict(stateArray) {
         if (!this.isInitialized) return [0, 0, 0]; 
 
-        // 探索階段：啟動專家模仿學習
         if (Math.random() < this.explorationRate) {
-            // 70% 靠專家數學雷達示範神仙球，30% 瞎猜發掘新招式
             if (Math.random() < 0.7) {
                 return this.getExpertAction();
             } else {
@@ -866,7 +823,6 @@ class CarromBrain {
             }
         }
 
-        // 純神經網路大腦推論
         return tf.tidy(() => {
             const inputTensor = tf.tensor2d([stateArray]);
             const prediction = this.model.predict(inputTensor);
@@ -874,17 +830,14 @@ class CarromBrain {
         });
     }
 
-    //🔥 3. 結合記憶庫的批次訓練 (Batch Training)
     async rememberAndTrain(stateArray, actionTaken, reward) {
         if (!this.isInitialized) return;
 
-        // 將剛發生的經驗存入大腦
         this.memory.push({ state: stateArray, action: actionTaken, reward: reward });
         if (this.memory.length > this.maxMemory) {
-            this.memory.shift(); // 記憶滿了就忘記最舊的
+            this.memory.shift(); 
         }
 
-        // 從記憶中隨機挑選 32 筆經驗出來覆習
         const batchSize = Math.min(this.memory.length, this.batchSize);
         const batch = [];
         for (let i = 0; i < batchSize; i++) {
@@ -892,10 +845,8 @@ class CarromBrain {
             batch.push(this.memory[randomIndex]);
         }
         
-        // 確保剛發生的事情一定會被覆習到
         batch[0] = this.memory[this.memory.length - 1];
 
-        // 準備 TensorFlow 訓練資料
         const states = batch.map(b => b.state);
         const targetActions = batch.map(b => {
             return b.action.map(a => {
@@ -907,7 +858,6 @@ class CarromBrain {
         const xs = tf.tensor2d(states);
         const ys = tf.tensor2d(targetActions);
 
-        // 進行批次訓練
         await this.model.fit(xs, ys, { epochs: 1, verbose: 0 });
 
         xs.dispose();
@@ -961,3 +911,18 @@ function requestLocalAIPrediction() {
         executeAIActionSync();
     }, delay);
 }
+
+//🔥 終極物理核心：自定義主迴圈 (取代預設 Runner，完美解決摩擦力失效問題)
+async function customGameLoop() {
+    if (!isBackgroundTraining) {
+        const steps = isSelfPlayTraining ? currentTrainingSpeed : 1;
+        for (let i = 0; i < steps; i++) {
+            Engine.update(engine, 16.666); // 永遠使用標準時間步長，保證完美摩擦力與碰撞
+            await checkTurnEndAsync();
+        }
+        Render.world(render); 
+    }
+    window.requestAnimationFrame(customGameLoop);
+}
+// 啟動我們的專屬神級迴圈
+customGameLoop();
