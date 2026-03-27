@@ -146,6 +146,7 @@ let currentPlayer = 1;
 let pottedOwnPieceThisTurn = false;
 let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
+let hitAnyPuckThisTurn = false; //🔥 追蹤這回合是否打到任何棋子
 let piecesPottedThisTurn = []; 
 
 // 用於機器學習的狀態追蹤與掛機系統
@@ -153,7 +154,19 @@ let lastAIState = null;
 let lastAIAction = null;
 let isSelfPlayTraining = false; // 是否開啟 AI 左右互搏模式
 let totalTurnsThisGame = 0; // 記錄打了幾桿，避免死局
-let currentTrainingSpeed = 10; //🔥 記錄當前使用者設定的訓練速度
+let currentTrainingSpeed = 10; // 記錄當前使用者設定的訓練速度
+
+//🔥 新增：全局碰撞監聽器，確認打擊子有沒有撞到目標
+Events.on(engine, 'collisionStart', (event) => {
+    event.pairs.forEach(pair => {
+        const { bodyA, bodyB } = pair;
+        // 如果碰撞的雙方是 striker (打擊子) 和 puck (一般棋子/皇后)
+        if ((bodyA.label === 'striker' && bodyB.label === 'puck') || 
+            (bodyB.label === 'striker' && bodyA.label === 'puck')) {
+            hitAnyPuckThisTurn = true; // 標記為有撞到球
+        }
+    });
+});
 
 // 5. 處理嚴格進洞邏輯
 Events.on(engine, 'afterUpdate', () => {
@@ -296,6 +309,9 @@ window.addEventListener('pointerup', (e) => {
     }
 
     const forceVector = { x: forceX, y: forceY };
+    
+    //🔥 擊球前，重置碰撞追蹤器
+    hitAnyPuckThisTurn = false;
     Body.applyForce(striker, striker.position, forceVector);
 
     setTimeout(() => {
@@ -325,18 +341,29 @@ Events.on(engine, 'afterUpdate', async () => {
             }
         }
 
-        // 強化學習獎勵結算 (現在 P1 和 P2 都可以是 AI，統一訓練)
+        //🔥 判斷是否空杆犯規 (Miss Foul)
+        let isFoulMiss = !hitAnyPuckThisTurn;
+        
+        // 將所有犯規合併為一個判定 (洗澡、打錯皇后、空杆)
+        let isFoul = isFoulQueen || pottedStrikerThisTurn || isFoulMiss;
+
+        // 強化學習獎勵結算
         if ((currentPlayer === 2 || isSelfPlayTraining) && lastAIState && lastAIAction) {
             let reward = -0.1; // 基礎懲罰，逼迫 AI 趕快進球
             if (pottedOwnPieceThisTurn) reward += 10.0; // 打進自己的球，大獎勵！
-            if (pottedStrikerThisTurn) reward -= 10.0; // 洗澡，大懲罰！
-            if (isFoulQueen) reward -= 10.0; // 犯規，大懲罰！
+            
+            // 各種犯規的嚴厲懲罰
+            if (pottedStrikerThisTurn) reward -= 10.0; // 洗澡
+            if (isFoulQueen) reward -= 10.0; // 違規打進皇后
+            if (isFoulMiss) reward -= 10.0;  //🔥 空杆 (沒碰到球)，扣大分逼迫它去撞球
             
             // 訓練神經網路
             await carromBrain.train(lastAIState, lastAIAction, reward);
         }
 
-        if (isFoulQueen) {
+        //🔥 如果有任何犯規，執行退球懲罰 (吐出剛剛打進的球，並額外扣除一顆場下的球)
+        if (isFoul) {
+            // 退回這回合不小心打進的球 (通常空杆不會有這情形，但統一寫比較安全)
             piecesPottedThisTurn.forEach(p => {
                 const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
                 const ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
@@ -352,6 +379,7 @@ Events.on(engine, 'afterUpdate', async () => {
                 }
             });
 
+            // 罰球：將對應玩家已經打進洞的球，抓一顆出來擺回中間
             const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
             const penaltyPiece = pucks.find(p => p.render.fillStyle === myColor && p.position.x === -100 && !piecesPottedThisTurn.includes(p));
             
@@ -369,18 +397,21 @@ Events.on(engine, 'afterUpdate', async () => {
                     document.getElementById('white-count').innerText = `x ${whiteCount}`;
                 }
             }
-            pottedOwnPieceThisTurn = false; 
+            pottedOwnPieceThisTurn = false; // 犯規必定無法連續擊球
         }
 
-        const keepTurn = pottedOwnPieceThisTurn && !pottedStrikerThisTurn && !isFoulQueen;
+        // 決定是否保留球權：進自己球 + 沒有任何犯規
+        const keepTurn = pottedOwnPieceThisTurn && !isFoul;
 
         if (!keepTurn) {
             currentPlayer = currentPlayer === 1 ? 2 : 1;
         }
 
+        // 回合結束，清除所有的回合標記
         pottedOwnPieceThisTurn = false;
         pottedStrikerThisTurn = false;
         pottedQueenThisTurn = false;
+        hitAnyPuckThisTurn = false; //🔥 重置空杆判定
         piecesPottedThisTurn = []; 
         
         const turnIndicator = document.getElementById('turn-indicator');
@@ -413,7 +444,7 @@ Events.on(engine, 'afterUpdate', async () => {
         }
 
         if (currentPlayer === 2 || isSelfPlayTraining) {
-            //🔥 根據使用者設定的速度動態縮短延遲時間，避免發呆
+            // 根據使用者設定的速度動態縮短延遲時間，避免發呆
             const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
             setTimeout(requestLocalAIPrediction, delay);
         }
@@ -555,7 +586,6 @@ document.getElementById('speed-slider').addEventListener('input', (e) => {
     // 如果正在訓練中，即時套用新速度與防穿牆精度
     if (isSelfPlayTraining) {
         engine.timing.timeScale = currentTrainingSpeed;
-        // 動態增強物理精確度：速度越快，需要的計算次數越多才不會穿牆消失
         engine.positionIterations = 10 + currentTrainingSpeed * 2;
         engine.velocityIterations = 10 + currentTrainingSpeed * 2;
     }
@@ -763,6 +793,9 @@ function requestLocalAIPrediction() {
     // 移動打擊子
     Body.setPosition(striker, { x: aiX, y: aiStrikerY });
     Body.setVelocity(striker, { x: 0, y: 0 });
+
+    //🔥 擊球前，重置空杆追蹤器
+    hitAnyPuckThisTurn = false;
 
     // 訓練模式下，根據速度動態縮短延遲出桿
     const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
