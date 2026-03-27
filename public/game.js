@@ -1,6 +1,6 @@
 const { Engine, Render, Runner, Bodies, Composite, Vector, Body, Events } = Matter;
 
-const socket = io(); //🔥 初始化與伺服器的連線
+const socket = io(); // 保留連線能力
 
 const WIDTH = 600;
 const HEIGHT = 600;
@@ -147,6 +147,10 @@ let pottedOwnPieceThisTurn = false;
 let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
 let piecesPottedThisTurn = []; 
+
+//🔥 用於機器學習的狀態追蹤
+let lastAIState = null;
+let lastAIAction = null;
 
 // 5. 處理嚴格進洞邏輯
 Events.on(engine, 'afterUpdate', () => {
@@ -297,7 +301,7 @@ window.addEventListener('pointerup', (e) => {
 });
 
 // 7. 檢查是否所有棋子都靜止，並處理回合切換
-Events.on(engine, 'afterUpdate', () => {
+Events.on(engine, 'afterUpdate', async () => {
     let anyMoving = false;
     if (striker.speed > 0.1) anyMoving = true;
     pucks.forEach(p => {
@@ -315,6 +319,17 @@ Events.on(engine, 'afterUpdate', () => {
             if (ownRemaining > 0) {
                 isFoulQueen = true;
             }
+        }
+
+        //🔥 強化學習獎勵結算 (Reward Calculation)
+        if (currentPlayer === 2 && lastAIState && lastAIAction) {
+            let reward = -0.1; // 基礎懲罰，逼迫 AI 趕快進球
+            if (pottedOwnPieceThisTurn) reward += 10.0; // 打進自己的白球，大獎勵！
+            if (pottedStrikerThisTurn) reward -= 10.0; // 洗澡，大懲罰！
+            if (isFoulQueen) reward -= 10.0; // 犯規，大懲罰！
+            
+            // 訓練神經網路
+            await carromBrain.train(lastAIState, lastAIAction, reward);
         }
 
         if (isFoulQueen) {
@@ -369,8 +384,7 @@ Events.on(engine, 'afterUpdate', () => {
             turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
             turnIndicator.style.color = "#2ecc71"; // 綠色
         } else {
-            //🔥 更新為明確的 AI 準備狀態
-            turnIndicator.innerText = "現在輪到：AI (準備中...)";
+            turnIndicator.innerText = "現在輪到：AI 神經網路 (思考中...)";
             turnIndicator.style.color = "#e74c3c"; // 紅色
         }
 
@@ -379,7 +393,8 @@ Events.on(engine, 'afterUpdate', () => {
         Body.setVelocity(striker, { x: 0, y: 0 });
 
         if (currentPlayer === 2) {
-            requestAIAction();
+            //🔥 呼叫本機的 TensorFlow 神經網路進行打擊
+            requestLocalAIPrediction();
         }
     }
 });
@@ -509,76 +524,127 @@ Events.on(render, 'afterRender', () => {
     }
 });
 
-//🔥 === 新增 AI 專屬邏輯區塊 ===
+//🔥 === TensorFlow.js 本機機器學習 AI 大腦 ===
 
-function requestAIAction() {
-    const whitePucks = pucks
-        .filter(p => p.render.fillStyle === colorWhite && p.position.x !== -100)
-        .map(p => ({ x: Math.round(p.position.x), y: Math.round(p.position.y) }));
-    const blackPucks = pucks
-        .filter(p => p.render.fillStyle === colorBlack && p.position.x !== -100)
-        .map(p => ({ x: Math.round(p.position.x), y: Math.round(p.position.y) }));
-    const queenPuck = pucks.find(p => p.render.fillStyle === colorQueen && p.position.x !== -100);
+class CarromBrain {
+    constructor() {
+        this.model = tf.sequential();
+        
+        // 輸入層：19 顆棋子 * 2 (x,y 座標) = 38 個特徵
+        this.model.add(tf.layers.dense({ units: 64, inputShape: [38], activation: 'relu' }));
+        this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
+        
+        // 輸出層：3 個數值 (strikerX, forceX, forceY)
+        // 使用 tanh 讓輸出介於 -1 到 1 之間
+        this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
+        
+        // 編譯神經網路
+        this.model.compile({
+            optimizer: tf.train.adam(0.01),
+            loss: 'meanSquaredError'
+        });
 
-    const gameState = {
-        whitePucks,
-        blackPucks,
-        queen: queenPuck ? { x: Math.round(queenPuck.position.x), y: Math.round(queenPuck.position.y) } : null
-    };
+        this.explorationRate = 1.0; // 初始探索率 (100% 隨機嘗試)
+        this.explorationDecay = 0.995; // 每次打擊後慢慢降低隨機性
+        this.minExploration = 0.05; // 至少保留 5% 的隨機性來尋找新打法
+    }
 
-    socket.emit('requestAIMove', gameState);
+    // 將物理盤面轉換成神經網路看得懂的 38 維陣列
+    getStateArray() {
+        const state = [];
+        // 確保陣列順序永遠固定：9顆白棋、9顆黑棋、1顆皇后
+        for (let id = 100; id <= 118; id++) {
+            const puck = pucks.find(p => p.id === id);
+            if (puck && puck.position.x !== -100) {
+                // 正規化座標到 0~1 之間，方便神經網路吸收
+                state.push(puck.position.x / WIDTH);
+                state.push(puck.position.y / HEIGHT);
+            } else {
+                // 如果已經進洞，補 0
+                state.push(0);
+                state.push(0);
+            }
+        }
+        return state;
+    }
+
+    // 進行預測或隨機探索
+    predict(stateArray) {
+        // 如果擲骰子小於探索率，就大膽隨機嘗試 (Exploration)
+        if (Math.random() < this.explorationRate) {
+            return [
+                (Math.random() * 2) - 1, // strikerX 映射: -1 到 1
+                (Math.random() * 2) - 1, // forceX 映射: -1 到 1
+                (Math.random() * 2) - 1  // forceY 映射: -1 到 1
+            ];
+        }
+
+        // 否則，依照神經網路目前的智慧進行推論 (Exploitation)
+        return tf.tidy(() => {
+            const inputTensor = tf.tensor2d([stateArray]);
+            const prediction = this.model.predict(inputTensor);
+            return prediction.dataSync();
+        });
+    }
+
+    // 根據獎勵調整神經網路權重
+    async train(stateArray, actionTaken, reward) {
+        // 建立一組期望的目標輸出。如果得到正獎勵，就更鼓勵這個動作；負獎勵則遠離
+        const targetAction = actionTaken.map(a => {
+            // 簡單的 Policy Gradient 近似概念
+            let adjustment = a + (reward * 0.1 * a);
+            return Math.max(-1, Math.min(1, adjustment)); // 限制在 -1 到 1
+        });
+
+        const xs = tf.tensor2d([stateArray]);
+        const ys = tf.tensor2d([targetAction]);
+
+        await this.model.fit(xs, ys, { epochs: 1, verbose: 0 });
+
+        xs.dispose();
+        ys.dispose();
+
+        // 降低探索率，讓 AI 慢慢變得越來越確定
+        if (this.explorationRate > this.minExploration) {
+            this.explorationRate *= this.explorationDecay;
+        }
+
+        // 更新 UI 狀態
+        document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (上次獎勵: ${reward})`;
+    }
 }
 
-//🔥 接收 AI 即時狀態更新並顯示在左上角
-socket.on('aiStatus', (statusMessage) => {
-    const turnIndicator = document.getElementById('turn-indicator');
-    if (turnIndicator && currentPlayer === 2) {
-        turnIndicator.innerText = `現在輪到：AI - ${statusMessage}`;
-    }
-});
+// 初始化神經網路大腦
+const carromBrain = new CarromBrain();
 
-//🔥 接收並在畫面上顯示 AI 錯誤提示框 (沿用稍早加入的機制)
-socket.on('aiError', (errorMessage) => {
-    const errorToast = document.getElementById('error-toast');
-    if (errorToast) {
-        errorToast.innerText = errorMessage;
-        errorToast.style.display = 'block';  
-        
-        setTimeout(() => {
-            errorToast.style.display = 'none';
-        }, 5000);
-    } else {
-        alert(errorMessage);
-    }
-});
+// 呼叫本機 AI 進行推論並執行
+function requestLocalAIPrediction() {
+    lastAIState = carromBrain.getStateArray();
+    const rawAction = carromBrain.predict(lastAIState);
+    lastAIAction = rawAction;
 
-socket.on('aiMove', (move) => {
-    if (currentPlayer !== 2) return; 
+    // 將神經網路輸出的 [-1, 1] 解碼回遊戲物理世界的實際數值
+    // strikerX: -1~1 對應到 120~480
+    const aiX = 120 + ((rawAction[0] + 1) / 2) * (480 - 120); 
+    // forceX: -1~1 對應到 -0.8 ~ 0.8
+    const aiForceX = rawAction[1] * 0.8;
+    // forceY: -1~1 對應到 0.01 ~ 0.8 (強制往下打)
+    const aiForceY = 0.01 + ((rawAction[2] + 1) / 2) * 0.79;
 
-    //🔥 讓前端顯示 AI 已經做完決定
-    const turnIndicator = document.getElementById('turn-indicator');
-    if (turnIndicator) {
-        turnIndicator.innerText = "現在輪到：AI - 決定打擊力道與角度！";
-    }
-
-    const safeX = Math.max(120, Math.min(480, move.strikerX || 300));
-    let safeForceX = Math.max(-0.8, Math.min(0.8, move.forceX || 0));
-    let safeForceY = Math.max(0, Math.min(0.8, move.forceY || 0.4)); 
-
-    Body.setPosition(striker, { x: safeX, y: HEIGHT * 0.2 });
+    // 1. 移動打擊子到 AI 決定的 X 座標
+    Body.setPosition(striker, { x: aiX, y: HEIGHT * 0.2 });
     Body.setVelocity(striker, { x: 0, y: 0 });
 
+    const turnIndicator = document.getElementById('turn-indicator');
+    if (turnIndicator) turnIndicator.innerText = "現在輪到：AI 神經網路 - 出桿！";
+
+    // 2. 刻意延遲 0.5 秒再擊打，讓人類能看清楚
     setTimeout(() => {
-        //🔥 擊球瞬間顯示狀態
-        if (turnIndicator) {
-            turnIndicator.innerText = "現在輪到：AI - 擊球！";
-        }
-        
-        const forceVector = { x: safeForceX, y: safeForceY };
+        const forceVector = { x: aiForceX, y: aiForceY };
         Body.applyForce(striker, striker.position, forceVector);
         
         setTimeout(() => {
             turnActive = true;
         }, 50);
-    }, 1000);
-});
+    }, 500);
+}
