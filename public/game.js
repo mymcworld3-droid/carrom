@@ -384,7 +384,7 @@ Events.on(engine, 'afterUpdate', async () => {
         
         const turnIndicator = document.getElementById('turn-indicator');
         if (isSelfPlayTraining) {
-            turnIndicator.innerText = `🤖 訓練模式：AI 控制 P${currentPlayer} 運算中... (第 ${totalTurnsThisGame} 桿)`;
+            turnIndicator.innerText = `🤖 訓練模式：AI 10倍速運算中... (第 ${totalTurnsThisGame} 桿)`;
             turnIndicator.style.color = "#f39c12";
         } else if (currentPlayer === 1) {
             turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
@@ -398,7 +398,7 @@ Events.on(engine, 'afterUpdate', async () => {
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
 
-        //🔥 死局防護機制：如果有人贏了，或是打了超過 150 桿都沒結束，強制存檔並重置網頁
+        // 死局防護機制：如果有人贏了，或是打了超過 150 桿都沒結束，強制存檔並重置網頁
         if (blackCount === 0 || whiteCount === 0 || totalTurnsThisGame > 150) {
             console.log("一局結束，強制存檔並重新載入...");
             await carromBrain.save();
@@ -412,7 +412,7 @@ Events.on(engine, 'afterUpdate', async () => {
         }
 
         if (currentPlayer === 2 || isSelfPlayTraining) {
-            // 呼叫本機的 TensorFlow 神經網路進行打擊，如果是訓練模式就完全拔除等待延遲
+            //🔥 訓練模式下，拔除等待時間，全速出桿
             const delay = isSelfPlayTraining ? 10 : 500;
             setTimeout(requestLocalAIPrediction, delay);
         }
@@ -544,19 +544,31 @@ Events.on(render, 'afterRender', () => {
     }
 });
 
-//🔥 === UI 按鈕控制邏輯 ===
+//🔥 === UI 按鈕控制邏輯 (包含 10 倍速核心) ===
 
 // 啟動自我訓練模式
 document.getElementById('btn-self-play').addEventListener('click', () => {
     isSelfPlayTraining = !isSelfPlayTraining;
     const btn = document.getElementById('btn-self-play');
     if(isSelfPlayTraining) {
-        btn.innerText = "🛑 停止 AI 掛機訓練";
+        btn.innerText = "🛑 停止 AI 掛機訓練 (10倍速進行中)";
         btn.style.backgroundColor = "#c0392b";
+        
+        //🔥 啟動 10 倍速物理引擎
+        engine.timing.timeScale = 10; 
+        // 增加碰撞運算迭代次數，避免 10 倍速導致球體穿牆 Bug
+        engine.positionIterations = 20; 
+        engine.velocityIterations = 20;
+        
         requestLocalAIPrediction(); // 立刻啟動
     } else {
         btn.innerText = "🤖 啟動 AI 左右互搏 (加速訓練)";
         btn.style.backgroundColor = "#e67e22";
+        
+        // 恢復正常速度
+        engine.timing.timeScale = 1; 
+        engine.positionIterations = 10; 
+        engine.velocityIterations = 10;
     }
 });
 
@@ -592,11 +604,10 @@ class CarromBrain {
 
     async init() {
         try {
-            //🔥 第一優先：嘗試讀取伺服器上的「全球發布版」模型
-            // 這就是你要給所有人玩的最終目標！
+            // 第一優先：嘗試讀取伺服器上的「全球發布版」模型
             this.model = await tf.loadLayersModel('./carrom-ai-model.json');
             console.log('成功載入伺服器上的【全球發布版 AI】！');
-            this.explorationRate = 0.05; // 既然是完成品，不需要太多亂數探索
+            this.explorationRate = 0.05; 
             document.getElementById('ml-status').innerText = `已載入伺服器上的最強大腦！`;
         } catch (e1) {
             try {
@@ -614,8 +625,7 @@ class CarromBrain {
                 console.log('找不到舊記憶，建立全新 AI 大腦...');
                 this.model = tf.sequential();
                 
-                //🔥 輸入層：19 顆棋子 * 2 (x,y 座標) + 1 (當前是玩家幾) = 39 個特徵
-                // 加了 currentPlayer 特徵，它才知道現在要往上打還是往下打
+                // 輸入層：19 顆棋子 * 2 (x,y 座標) + 1 (當前是玩家幾) = 39 個特徵
                 this.model.add(tf.layers.dense({ units: 64, inputShape: [39], activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
                 
@@ -715,7 +725,7 @@ function requestLocalAIPrediction() {
     const rawAction = carromBrain.predict(lastAIState);
     lastAIAction = rawAction;
 
-    //🔥 解碼神經網路輸出，並支援上下兩邊的不同打法
+    // 解碼神經網路輸出，並支援上下兩邊的不同打法
     const aiX = 120 + ((rawAction[0] + 1) / 2) * (480 - 120); 
     const aiForceX = rawAction[1] * 0.8;
     
@@ -735,7 +745,7 @@ function requestLocalAIPrediction() {
     Body.setPosition(striker, { x: aiX, y: aiStrikerY });
     Body.setVelocity(striker, { x: 0, y: 0 });
 
-    // 刻意延遲再擊打 (如果是非訓練模式，讓人類看清楚)
+    //🔥 訓練模式下，拔除等待時間，全速出桿
     const delay = isSelfPlayTraining ? 10 : 500;
     setTimeout(() => {
         const forceVector = { x: aiForceX, y: aiForceY };
@@ -743,6 +753,6 @@ function requestLocalAIPrediction() {
         
         setTimeout(() => {
             turnActive = true;
-        }, 50);
+        }, isSelfPlayTraining ? 10 : 50); // 訓練模式下直接標記回合啟動，不再等待
     }, delay);
 }
