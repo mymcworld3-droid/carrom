@@ -345,4 +345,805 @@ function resetGame() {
     }
 
     for (let i = 0; i < 12; i++) {
-        const angle
+        const angle = (i * Math.PI) / 6;
+        let dist = (i % 2 === 0) ? gap * 2 : gap * Math.sqrt(3);
+        const p = pucks.find(p => p.id === 107 + i);
+        Body.setPosition(p, { x: cx + Math.cos(angle) * dist, y: cy + Math.sin(angle) * dist });
+        Body.setVelocity(p, { x: 0, y: 0 });
+    }
+
+    Body.setPosition(striker, { x: WIDTH / 2, y: HEIGHT * 0.8 });
+    Body.setVelocity(striker, { x: 0, y: 0 });
+}
+
+// 結算回合 (加入 DDPG NextState 與 Done 處理)
+async function checkTurnEndAsync() {
+    let anyMoving = false;
+    if (striker.speed > 0.1) anyMoving = true;
+    pucks.forEach(p => {
+        if (p.speed > 0.1) anyMoving = true;
+    });
+
+    isMoving = anyMoving;
+
+    if (!isMoving && turnActive) {
+        turnActive = false; 
+        totalTurnsThisGame++; 
+        
+        let isFoulQueen = false;
+        let isGameWon = false;
+        
+        const ownRemaining = currentPlayer === 1 ? blackCount : whiteCount;
+        
+        if (pottedQueenThisTurn) {
+            if (ownRemaining > 0) {
+                isFoulQueen = true; 
+            } else {
+                isGameWon = true;   
+            }
+        }
+
+        let isFoulMiss = !hitAnyPuckThisTurn;
+        let isFoul = isFoulQueen || pottedStrikerThisTurn || isFoulMiss;
+
+        if (isFoulMiss) {
+            consecutiveMisses++;
+            if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && consecutiveMisses >= 4) {
+                carromBrain.explorationRate = Math.max(carromBrain.explorationRate, 0.8);
+                consecutiveMisses = 0;
+            }
+        } else {
+            consecutiveMisses = 0;
+        }
+
+        //🔥 DDPG 的獎勵設計：不再過濾掉失敗軌跡，我們要讓 Critic 知道什麼是「不好的分數」
+        if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && lastAIState && lastAIAction) {
+            let reward = -0.5; // 基礎時間扣分 (逼迫快點獲勝)
+            if (pottedOwnPieceThisTurn) reward += 10.0; 
+            if (pottedStrikerThisTurn) reward -= 10.0; 
+            
+            if (pottedQueenThisTurn) {
+                if (ownRemaining > 0) reward -= 20.0; 
+                else reward += 100.0; 
+            }
+            if (isFoulMiss) reward -= 5.0;  
+            
+            // 取得回合結束後的最新盤面狀態
+            const nextAIState = carromBrain.getStateArray();
+            const isDone = isGameWon || blackCount === 0 || whiteCount === 0 || totalTurnsThisGame > 150;
+
+            // 將完整的 (S, A, R, S', Done) 送入 DDPG 大腦訓練
+            await carromBrain.rememberAndTrain(lastAIState, lastAIAction, reward, nextAIState, isDone);
+        }
+
+        if (isFoul) {
+            piecesPottedThisTurn.forEach(p => {
+                let rx = WIDTH/2 + (Math.random() - 0.5) * 40;
+                let ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
+                
+                if (p.render.fillStyle === colorQueen) {
+                    rx = WIDTH / 2;
+                    ry = HEIGHT / 2;
+                }
+
+                Body.setPosition(p, { x: rx, y: ry });
+                Body.setVelocity(p, { x: 0, y: 0 });
+
+                if (p.render.fillStyle === colorBlack) {
+                    blackCount++;
+                    if(!isBackgroundTraining) document.getElementById('black-count').innerText = `x ${blackCount}`;
+                } else if (p.render.fillStyle === colorWhite) {
+                    whiteCount++;
+                    if(!isBackgroundTraining) document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                }
+            });
+
+            const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
+            const penaltyPiece = pucks.find(p => p.render.fillStyle === myColor && p.position.x === -100 && !piecesPottedThisTurn.includes(p));
+            
+            if (penaltyPiece) {
+                const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
+                const ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
+                Body.setPosition(penaltyPiece, { x: rx, y: ry });
+                Body.setVelocity(penaltyPiece, { x: 0, y: 0 });
+                
+                if (myColor === colorBlack) {
+                    blackCount++;
+                    if(!isBackgroundTraining) document.getElementById('black-count').innerText = `x ${blackCount}`;
+                } else {
+                    whiteCount++;
+                    if(!isBackgroundTraining) document.getElementById('white-count').innerText = `x ${whiteCount}`;
+                }
+            }
+            pottedOwnPieceThisTurn = false; 
+        }
+
+        const keepTurn = (pottedOwnPieceThisTurn || isGameWon) && !isFoul;
+
+        if (!keepTurn) {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+        }
+
+        pottedOwnPieceThisTurn = false;
+        pottedStrikerThisTurn = false;
+        pottedQueenThisTurn = false;
+        hitAnyPuckThisTurn = false; 
+        piecesPottedThisTurn = []; 
+        
+        if (!isBackgroundTraining) {
+            const turnIndicator = document.getElementById('turn-indicator');
+            if (isSelfPlayTraining) {
+                turnIndicator.innerText = `🤖 訓練模式：AI 運算中... (第 ${totalTurnsThisGame} 桿)`;
+                turnIndicator.style.color = "#f39c12";
+            } else if (currentPlayer === 1) {
+                turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
+                turnIndicator.style.color = "#2ecc71"; 
+            } else {
+                turnIndicator.innerText = "現在輪到：AI 神經網路 (思考中...)";
+                turnIndicator.style.color = "#e74c3c"; 
+            }
+        }
+
+        const resetY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
+        Body.setPosition(striker, { x: WIDTH/2, y: resetY });
+        Body.setVelocity(striker, { x: 0, y: 0 });
+
+        if (isGameWon || totalTurnsThisGame > 150) {
+            if (isBackgroundTraining) {
+                bgTrainingCurrent++;
+                document.getElementById('bg-progress-text').innerText = `已完成: ${bgTrainingCurrent} / ${bgTrainingTarget} 局`;
+            }
+            
+            if (typeof addChartData === 'function') {
+                addChartData(totalTurnsThisGame);
+            }
+            
+            await carromBrain.save();
+            resetGame(); 
+            
+            if (!isBackgroundTraining && (isSelfPlayTraining || currentPlayer === 2)) {
+                const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
+                setTimeout(requestLocalAIPrediction, delay);
+            }
+            return;
+        }
+
+        if (!isBackgroundTraining && (currentPlayer === 2 || isSelfPlayTraining)) {
+            const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
+            setTimeout(requestLocalAIPrediction, delay);
+        }
+    }
+}
+
+// 8. 自定義繪製
+Events.on(render, 'afterRender', () => {
+    const ctx = render.context;
+    
+    ctx.save();
+    ctx.translate(WIDTH/2, HEIGHT/2);
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+        ctx.rotate(Math.PI / 4);
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(20, -50, 40, -50, 0, -80);
+        ctx.bezierCurveTo(-40, -50, -20, -50, 0, 0);
+    }
+    ctx.strokeStyle = 'rgba(93, 64, 55, 0.4)'; 
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0, 2 * Math.PI);
+    ctx.fillStyle = '#d35400';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.moveTo(100, HEIGHT * 0.8);
+    ctx.lineTo(WIDTH - 100, HEIGHT * 0.8);
+    ctx.moveTo(100, HEIGHT * 0.2);
+    ctx.lineTo(WIDTH - 100, HEIGHT * 0.2);
+    ctx.strokeStyle = 'rgba(62, 39, 35, 0.6)'; 
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#3e2723'; 
+    ctx.beginPath(); ctx.arc(100, HEIGHT * 0.8, 4, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(WIDTH - 100, HEIGHT * 0.8, 4, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(100, HEIGHT * 0.2, 4, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(WIDTH - 100, HEIGHT * 0.2, 4, 0, 2 * Math.PI); ctx.fill();
+
+    const allGamePieces = [...pucks, striker];
+    allGamePieces.sort((pieceA, pieceB) => pieceA.position.y - pieceB.position.y);
+
+    allGamePieces.forEach(p => {
+        if (p.position.x === -100) return;
+
+        const pos = p.position;
+        const radius = p.circleRadius;
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = p.render.fillStyle;
+        ctx.fill();
+        if (p.render.strokeStyle) {
+            ctx.strokeStyle = p.render.strokeStyle;
+            ctx.lineWidth = p.render.lineWidth || 1;
+            ctx.stroke();
+        }
+
+        if (p.label === 'striker') {
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, radius - 5, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)'; 
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(pos.x - radius/3, pos.y - radius/3, radius/3, 1 * Math.PI, 1.5 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; 
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, radius - 3, 0, 2 * Math.PI); 
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'; 
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(pos.x - radius/3, pos.y - radius/3, radius/3, 1 * Math.PI, 1.5 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    });
+
+    if (isDragging && startPoint) {
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.lineTo(mousePos.x, mousePos.y);
+        ctx.strokeStyle = 'rgba(62, 39, 35, 0.7)'; 
+        ctx.lineWidth = 5; 
+        ctx.setLineDash([8, 8]); 
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    for (let i = potEffects.length - 1; i >= 0; i--) {
+        const effect = potEffects[i];
+        
+        ctx.save();
+        const alpha = effect.life / 30; 
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r, 0, 2 * Math.PI);
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        if (alpha > 0) {
+            ctx.globalAlpha = alpha * 0.8;
+            const scaledRad = effect.pieceRad * alpha; 
+            ctx.beginPath();
+            ctx.arc(effect.piecePos.x, effect.piecePos.y, scaledRad, 0, 2 * Math.PI);
+            ctx.fillStyle = effect.pieceColor;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        effect.r += 2; 
+        effect.life--; 
+
+        if (effect.life <= 0) {
+            potEffects.splice(i, 1);
+        }
+    }
+});
+
+// UI 按鈕與控制邏輯
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+    currentTrainingSpeed = parseInt(e.target.value);
+    document.getElementById('speed-label').innerText = `畫面速度: ${currentTrainingSpeed}x`;
+});
+
+document.getElementById('btn-self-play').addEventListener('click', () => {
+    isSelfPlayTraining = !isSelfPlayTraining;
+    const btn = document.getElementById('btn-self-play');
+    if(isSelfPlayTraining) {
+        btn.innerText = "🛑 停止畫面互搏";
+        btn.style.backgroundColor = "#c0392b";
+        requestLocalAIPrediction(); 
+    } else {
+        btn.innerText = "🤖 啟動畫面互搏";
+        btn.style.backgroundColor = "#e67e22";
+    }
+});
+
+document.getElementById('btn-download').addEventListener('click', async () => {
+    if (!carromBrain.isInitialized) return;
+    try {
+        await carromBrain.actor.save('downloads://carrom-actor');
+        alert("下載成功！請將獲得的模型與權重檔案放到專案的 public 目錄中。");
+    } catch (e) {
+        alert("下載失敗：" + e.message);
+    }
+});
+
+document.getElementById('btn-reset-ai').addEventListener('click', async () => {
+    const confirmReset = confirm("確定要刪除 AI 的所有記憶，讓它從頭開始學習嗎？");
+    if (confirmReset) {
+        localStorage.removeItem('carrom-ai-exploration');
+        localStorage.removeItem('carrom-ai-memory'); 
+        try { await tf.io.removeModel('localstorage://carrom-actor'); } catch(e) {}
+        try { await tf.io.removeModel('localstorage://carrom-critic'); } catch(e) {}
+        if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
+        alert("記憶已清除！網頁將重新載入。");
+        window.location.href = window.location.pathname;
+    }
+});
+
+document.getElementById('btn-bg-train').addEventListener('click', async () => {
+    if (isBackgroundTraining) return;
+    isBackgroundTraining = true;
+    
+    const userInput = parseInt(document.getElementById('bg-target-input').value);
+    bgTrainingTarget = isNaN(userInput) || userInput <= 0 ? 50 : userInput;
+    bgTrainingCurrent = 0;
+    
+    if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
+
+    document.getElementById('bg-training-screen').style.display = 'flex';
+    document.querySelector('canvas').style.display = 'none';
+    
+    document.getElementById('bg-progress-text').innerText = `已完成: 0 / ${bgTrainingTarget} 局`;
+
+    resetGame();
+
+    let ticks = 0;
+    while (bgTrainingCurrent < bgTrainingTarget) {
+        if (!isMoving && !turnActive) {
+            executeAIActionSync();
+        }
+
+        Engine.update(engine, 16.666);
+        await checkTurnEndAsync();
+
+        ticks++;
+        if (ticks % 100 === 0) {
+            await new Promise(r => setTimeout(r, 0)); 
+        }
+    }
+
+    await carromBrain.save();
+    isBackgroundTraining = false;
+    
+    if (turnChart) turnChart.update();
+
+    document.getElementById('bg-training-screen').style.display = 'none';
+    document.querySelector('canvas').style.display = 'block';
+    
+    resetGame();
+    alert(`⚡ 精神時光屋修煉完成！${bgTrainingTarget} 局極速訓練已結束，AI 大腦已存檔！`);
+});
+
+
+//🔥 TensorFlow.js: 全新 DDPG (Deep Deterministic Policy Gradient) 強化學習引擎
+class CarromBrain {
+    constructor() {
+        this.gamma = 0.99; // 獎勵衰減率 (考量未來的利益)
+        this.tau = 0.005; // 目標網路平滑更新係數
+        this.batchSize = 64; // DDPG 需要稍大的批次來穩定學習
+        this.memory = [];
+        this.maxMemory = 2000;
+        this.explorationRate = 1.0; 
+        this.explorationDecay = 0.995; 
+        this.minExploration = 0.05; 
+        this.isInitialized = false; 
+    }
+
+    // 演員網路 (負責決定打擊動作)
+    createActor() {
+        const model = tf.sequential();
+        model.add(tf.layers.dense({ units: 128, inputShape: [39], activation: 'relu' }));
+        model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
+        model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
+        model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); // 輸出 strikerX, forceX, forceY (-1 ~ 1)
+        return model;
+    }
+
+    // 評論家網路 (負責預測這桿打出去後，未來的獲勝分數 Q-Value)
+    createCritic() {
+        const stateInput = tf.input({ shape: [39] });
+        const actionInput = tf.input({ shape: [3] });
+        const concat = tf.layers.concatenate().apply([stateInput, actionInput]);
+        
+        const d1 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(concat);
+        const d2 = tf.layers.dense({ units: 128, activation: 'relu' }).apply(d1);
+        const d3 = tf.layers.dense({ units: 64, activation: 'relu' }).apply(d2);
+        const output = tf.layers.dense({ units: 1, activation: 'linear' }).apply(d3);
+        
+        return tf.model({ inputs: [stateInput, actionInput], outputs: output });
+    }
+
+    async init() {
+        try {
+            // 先嘗試讀取本地儲存的進度
+            this.actor = await tf.loadLayersModel('localstorage://carrom-actor');
+            this.critic = await tf.loadLayersModel('localstorage://carrom-critic');
+            
+            const savedRate = localStorage.getItem('carrom-ai-exploration');
+            if (savedRate !== null) this.explorationRate = parseFloat(savedRate);
+
+            const savedMemory = localStorage.getItem('carrom-ai-memory');
+            if (savedMemory !== null) this.memory = JSON.parse(savedMemory);
+
+            document.getElementById('ml-status').innerText = `本地 DDPG 載入成功！目前探索率: ${Math.round(this.explorationRate * 100)}% (記憶庫: ${this.memory.length})`;
+        } catch (e) {
+            console.log('建立全新的 DDPG 雙腦模型...');
+            this.actor = this.createActor();
+            this.critic = this.createCritic();
+        }
+
+        // 建立 Target 網路 (穩定訓練用)
+        this.targetActor = this.createActor();
+        this.targetCritic = this.createCritic();
+        this.targetActor.setWeights(this.actor.getWeights());
+        this.targetCritic.setWeights(this.critic.getWeights());
+
+        // 設定優化器
+        this.actorOpt = tf.train.adam(1e-4);
+        this.criticOpt = tf.train.adam(1e-3);
+        
+        this.isInitialized = true;
+    }
+
+    async save() {
+        if (!this.isInitialized) return;
+        await this.actor.save('localstorage://carrom-actor');
+        await this.critic.save('localstorage://carrom-critic');
+        localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
+        
+        try {
+            const memoryToSave = this.memory.slice(-1000); 
+            localStorage.setItem('carrom-ai-memory', JSON.stringify(memoryToSave));
+        } catch(e) {
+            console.warn('記憶庫存檔失敗', e);
+        }
+    }
+
+    getStateArray() {
+        const state = [];
+        const queen = pucks.find(p => p.render.fillStyle === colorQueen);
+        if (queen && queen.position.x !== -100) {
+            state.push(queen.position.x / WIDTH, queen.position.y / HEIGHT);
+        } else {
+            state.push(-1, -1);
+        }
+
+        const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
+        const oppColor = currentPlayer === 1 ? colorWhite : colorBlack;
+        let myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
+        let oppPucks = pucks.filter(p => p.render.fillStyle === oppColor && p.position.x !== -100);
+
+        const targetY = currentPlayer === 1 ? 30 : HEIGHT - 30;
+        myPucks.sort((a, b) => Math.abs(a.position.y - targetY) - Math.abs(b.position.y - targetY));
+        oppPucks.sort((a, b) => Math.abs(a.position.y - targetY) - Math.abs(b.position.y - targetY));
+
+        for (let i = 0; i < 9; i++) {
+            if (i < myPucks.length) {
+                state.push(myPucks[i].position.x / WIDTH, myPucks[i].position.y / HEIGHT);
+            } else { state.push(-1, -1); }
+        }
+
+        for (let i = 0; i < 9; i++) {
+            if (i < oppPucks.length) {
+                state.push(oppPucks[i].position.x / WIDTH, oppPucks[i].position.y / HEIGHT);
+            } else { state.push(-1, -1); }
+        }
+
+        state.push(currentPlayer === 1 ? 1 : -1);
+        return state;
+    }
+
+    getExpertAction() {
+        const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
+        let myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
+        
+        if (myPucks.length === 0) {
+            const queen = pucks.find(p => p.render.fillStyle === colorQueen && p.position.x !== -100);
+            if (queen) {
+                myPucks = [queen];
+            } else {
+                return null; 
+            }
+        }
+
+        if (myPucks.length === 0) return null;
+
+        const pocketY = currentPlayer === 1 ? 30 : HEIGHT - 30;
+        const leftPocket = {x: 30, y: pocketY};
+        const rightPocket = {x: WIDTH - 30, y: pocketY};
+        const strikerLineY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
+
+        const activeObstacles = pucks.filter(p => p.position.x !== -100);
+
+        for (let p of myPucks) {
+            const targets = [leftPocket, rightPocket];
+            
+            for (let pocket of targets) {
+                const rayToPocket = Matter.Query.ray(activeObstacles, p.position, pocket);
+                const obstaclesToPocket = rayToPocket.filter(hit => hit.body.id !== p.id);
+                
+                if (obstaclesToPocket.length === 0) {
+                    const dx = pocket.x - p.position.x;
+                    const offset = dx > 0 ? -12 : 12; 
+                    let idealStrikerX = p.position.x + offset;
+                    
+                    if (idealStrikerX < 120 || idealStrikerX > 480) continue;
+                    
+                    const strikerStartPos = { x: idealStrikerX, y: strikerLineY };
+
+                    const rayToPuck = Matter.Query.ray(activeObstacles, strikerStartPos, p.position);
+                    const obstaclesToPuck = rayToPuck.filter(hit => hit.body.id !== p.id);
+
+                    if (obstaclesToPuck.length === 0) {
+                        const forceX = dx > 0 ? 0.3 : -0.3;
+                        const forceY = currentPlayer === 1 ? -0.6 : 0.6; 
+
+                        const nnX = ((idealStrikerX - 120) / (480 - 120)) * 2 - 1;
+                        const nnForceX = forceX / 0.8;
+                        let nnForceY = 0;
+                        if (currentPlayer === 1) {
+                            nnForceY = ((forceY + 0.01) / -0.79) * 2 - 1;
+                        } else {
+                            nnForceY = ((forceY - 0.01) / 0.79) * 2 - 1;
+                        }
+
+                        return [
+                            Math.max(-1, Math.min(1, nnX)),
+                            Math.max(-1, Math.min(1, nnForceX)),
+                            Math.max(-1, Math.min(1, nnForceY))
+                        ];
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    predict(stateArray) {
+        if (!this.isInitialized) return [0, 0, 0]; 
+
+        let action;
+        
+        if (Math.random() < this.explorationRate) {
+            const expert = this.getExpertAction();
+            if (expert && Math.random() < 0.7) {
+                action = expert; // 70% 機率採納導師意見
+            } else {
+                action = [
+                    (Math.random() * 2) - 1, 
+                    (Math.random() * 2) - 1, 
+                    (Math.random() * 2) - 1  
+                ];
+            }
+        } else {
+            action = tf.tidy(() => {
+                return this.actor.predict(tf.tensor2d([stateArray])).dataSync();
+            });
+        }
+
+        //🔥 DDPG 的精髓：在連續空間中注入高斯雜訊 (Gaussian Noise)，讓 AI 擁有無限的創造力
+        const noiseScale = Math.max(0.01, this.explorationRate * 0.2);
+        return [
+            Math.max(-1, Math.min(1, action[0] + (Math.random() * 2 - 1) * noiseScale)),
+            Math.max(-1, Math.min(1, action[1] + (Math.random() * 2 - 1) * noiseScale)),
+            Math.max(-1, Math.min(1, action[2] + (Math.random() * 2 - 1) * noiseScale))
+        ];
+    }
+
+    softUpdate(model, targetModel) {
+        tf.tidy(() => {
+            const weights = model.getWeights();
+            const targetWeights = targetModel.getWeights();
+            const newWeights = weights.map((w, i) => w.mul(this.tau).add(targetWeights[i].mul(1 - this.tau)));
+            targetModel.setWeights(newWeights);
+        });
+    }
+
+    //🔥 DDPG 的自定義梯度計算訓練迴圈
+    async rememberAndTrain(state, action, reward, nextState, done) {
+        if (!this.isInitialized) return;
+
+        // DDPG 可以學習任何經驗，所以全部存入
+        this.memory.push({ state, action, reward, nextState, done });
+        if (this.memory.length > this.maxMemory) this.memory.shift(); 
+
+        if (this.memory.length < this.batchSize) return;
+
+        const batch = [];
+        for (let i = 0; i < this.batchSize; i++) {
+            batch.push(this.memory[Math.floor(Math.random() * this.memory.length)]);
+        }
+
+        tf.tidy(() => {
+            const states = tf.tensor2d(batch.map(b => b.state));
+            const actions = tf.tensor2d(batch.map(b => b.action));
+            const rewards = tf.tensor2d(batch.map(b => [b.reward]));
+            const nextStates = tf.tensor2d(batch.map(b => b.nextState));
+            const dones = tf.tensor2d(batch.map(b => [b.done ? 1.0 : 0.0]));
+
+            // --- 1. 訓練 Critic 網路 (評分員) ---
+            const criticLossFn = () => {
+                const targetActions = this.targetActor.predict(nextStates);
+                const targetQ = this.targetCritic.predict([nextStates, targetActions]);
+                // Bellman Equation: y = r + gamma * Q_target * (1 - done)
+                const y = targetQ.mul(tf.scalar(1).sub(dones)).mul(this.gamma).add(rewards);
+                const qValues = this.critic.apply([states, actions], {training: true});
+                return tf.losses.meanSquaredError(y, qValues);
+            };
+            const criticGrads = tf.variableGrads(criticLossFn);
+            const criticVarNames = this.critic.trainableWeights.map(v => v.name);
+            const filteredCriticGrads = {};
+            for (let name in criticGrads.grads) {
+                if (criticVarNames.includes(name)) filteredCriticGrads[name] = criticGrads.grads[name];
+            }
+            this.criticOpt.applyGradients(filteredCriticGrads);
+
+            // --- 2. 訓練 Actor 網路 (打擊員) ---
+            const actorLossFn = () => {
+                const predActions = this.actor.apply(states, {training: true});
+                // 演員的目標：讓評論家給出的分數越高越好 (Maximize Q)
+                const qValues = this.critic.apply([states, predActions], {training: false});
+                return tf.mean(qValues).mul(-1); 
+            };
+            const actorGrads = tf.variableGrads(actorLossFn);
+            const actorVarNames = this.actor.trainableWeights.map(v => v.name);
+            const filteredActorGrads = {};
+            for (let name in actorGrads.grads) {
+                if (actorVarNames.includes(name)) filteredActorGrads[name] = actorGrads.grads[name];
+            }
+            this.actorOpt.applyGradients(filteredActorGrads);
+        });
+
+        // --- 3. 平滑更新 Target 網路 ---
+        this.softUpdate(this.actor, this.targetActor);
+        this.softUpdate(this.critic, this.targetCritic);
+
+        if (this.explorationRate > this.minExploration) {
+            this.explorationRate *= this.explorationDecay;
+        }
+
+        if(!isBackgroundTraining) {
+            document.getElementById('ml-status').innerText = `DDPG 探索率: ${Math.round(this.explorationRate * 100)}% (記憶庫: ${this.memory.length})`;
+        }
+    }
+}
+
+const carromBrain = new CarromBrain();
+carromBrain.init(); 
+
+function executeAIActionSync() {
+    lastAIState = carromBrain.getStateArray();
+    
+    // 如果大師算出了必殺球，直接丟進記憶庫讓 DDPG 從示範中學習 (DDPGfD 機制)
+    const expert = carromBrain.getExpertAction();
+    if (expert) {
+        // 給予大師示範極高的預期分數，誘導 Critic 學會欣賞這些好球
+        const fakeNextState = lastAIState; 
+        carromBrain.memory.push({ state: lastAIState, action: expert, reward: 5.0, nextState: fakeNextState, done: false });
+    }
+
+    const rawAction = carromBrain.predict(lastAIState);
+    lastAIAction = rawAction;
+
+    const aiX = 120 + ((rawAction[0] + 1) / 2) * (480 - 120); 
+    const aiForceX = rawAction[1] * 0.8;
+    
+    let aiForceY = 0;
+    let aiStrikerY = 0;
+    if (currentPlayer === 1) {
+        aiForceY = -0.01 - ((rawAction[2] + 1) / 2) * 0.79; 
+        aiStrikerY = HEIGHT * 0.8;
+    } else {
+        aiForceY = 0.01 + ((rawAction[2] + 1) / 2) * 0.79; 
+        aiStrikerY = HEIGHT * 0.2;
+    }
+
+    Body.setPosition(striker, { x: aiX, y: aiStrikerY });
+    Body.setVelocity(striker, { x: 0, y: 0 });
+
+    hitAnyPuckThisTurn = false;
+    
+    const forceVector = { x: aiForceX, y: aiForceY };
+    Body.applyForce(striker, striker.position, forceVector);
+    
+    turnActive = true;
+}
+
+function requestLocalAIPrediction() {
+    const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
+    setTimeout(() => {
+        executeAIActionSync();
+    }, delay);
+}
+
+async function customGameLoop() {
+    if (!isBackgroundTraining) {
+        const steps = isSelfPlayTraining ? currentTrainingSpeed : 1;
+        for (let i = 0; i < steps; i++) {
+            Engine.update(engine, 16.666); 
+            await checkTurnEndAsync();
+        }
+        Render.world(render); 
+    }
+    window.requestAnimationFrame(customGameLoop);
+}
+customGameLoop();
+
+// === 折線圖資料與初始化 ===
+let globalGameCount = 0;
+let turnHistory = [];
+let gameLabels = [];
+let turnChart = null;
+
+function initChart() {
+    const ctx = document.getElementById('turnChart').getContext('2d');
+    
+    Chart.defaults.color = '#bdc3c7';
+    
+    turnChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: gameLabels,
+            datasets: [{
+                label: '單局出桿數 (越低越聰明)',
+                data: turnHistory,
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    display: true, 
+                    title: { display: true, text: '遊戲局數' } 
+                },
+                y: { 
+                    display: true, 
+                    title: { display: true, text: '總出桿數' }, 
+                    beginAtZero: true,
+                    max: 160 
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#ecf0f1' } }
+            }
+        }
+    });
+}
+
+function addChartData(turns) {
+    globalGameCount++;
+    
+    if (gameLabels.length >= 50) {
+        gameLabels.shift();
+        turnHistory.shift();
+    }
+    
+    gameLabels.push(globalGameCount);
+    turnHistory.push(turns);
+    
+    if (turnChart && !isBackgroundTraining) {
+        turnChart.update();
+    }
+}
+
+initChart();
