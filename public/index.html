@@ -34,8 +34,6 @@
         #btn-download:active { background-color: #2980b9; }
         #btn-reset-ai { background-color: #e74c3c; color: white; }
         #btn-reset-ai:active { background-color: #c0392b; }
-        
-        /*🔥 新增：背景極速訓練按鈕 */
         #btn-bg-train { background-color: #9b59b6; color: white; }
         #btn-bg-train:active { background-color: #8e44ad; }
         
@@ -43,7 +41,10 @@
         .speed-control { display: flex; align-items: center; gap: 10px; color: white; font-size: 14px; font-weight: bold; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 8px; }
         input[type=range] { cursor: pointer; }
 
-        /*🔥 新增：背景訓練遮罩畫面 */
+        /*🔥 新增：折線圖容器樣式 (放在右下角) */
+        #chart-container { position: absolute; bottom: 20px; right: 20px; width: 350px; height: 220px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); z-index: 50; }
+
+        /* 背景訓練遮罩畫面 */
         #bg-training-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 62, 80, 0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #bg-training-screen h2 { font-size: 36px; color: #f1c40f; margin-bottom: 10px; }
         #bg-progress-text { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
@@ -82,6 +83,10 @@
         <button id="btn-reset-ai">⚠️ 刪除記憶</button>
     </div>
 
+    <div id="chart-container">
+        <canvas id="turnChart"></canvas>
+    </div>
+
     <div id="bg-training-screen">
         <div class="spinner"></div>
         <h2>⚡ 精神時光屋：閉關極速訓練中...</h2>
@@ -92,6 +97,7 @@
     <script src="/socket.io/socket.io.js"></script> 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="game.js"></script>    
 </body>
 </html>
