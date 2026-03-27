@@ -78,7 +78,11 @@
             <span id="speed-label">畫面速度: 10x</span>
             <input type="range" id="speed-slider" min="1" max="20" value="10" step="1">
         </div>
-        <button id="btn-bg-train">⚡ 閉關極速訓練 500 局</button>
+        <div class="speed-control">
+            <span id="bg-target-label">目標局數:</span>
+            <input type="number" id="bg-target-input" value="50" min="1" max="5000" style="width: 60px; text-align: center; border-radius: 4px; border: none; padding: 2px;">
+        </div>
+        <button id="btn-bg-train">⚡ 啟動閉關極速訓練</button>
         <button id="btn-download">💾 匯出打包 AI 大腦</button>
         <button id="btn-reset-ai">⚠️ 刪除記憶</button>
     </div>
