@@ -145,7 +145,7 @@ let piecesPottedThisTurn = [];
 // 狀態追蹤與掛機系統
 let lastAIState = null;
 let lastAIAction = null;
-let lastAIExpertAction = null; //🔥 新增：記錄導師的完美動作
+let lastAIExpertAction = null;
 let isSelfPlayTraining = false; 
 let totalTurnsThisGame = 0; 
 let consecutiveMisses = 0; 
@@ -395,7 +395,6 @@ async function checkTurnEndAsync() {
             consecutiveMisses = 0;
         }
 
-        // 強化學習獎勵結算 (套用 Dagger 大師修正機制)
         if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && lastAIState && lastAIAction) {
             let reward = -0.1; 
             if (pottedOwnPieceThisTurn) reward += 10.0; 
@@ -412,13 +411,11 @@ async function checkTurnEndAsync() {
             if (isFoulMiss) {
                 reward -= 5.0;  
                 if (consecutiveMisses >= 4) {
-                    //🔥 移除暴力的探索率強制拉高，改用扣大分並依靠下方的專家修正機制
                     reward -= 50.0; 
                     consecutiveMisses = 0; 
                 }
             }
             
-            //🔥 將動作、狀態、獎勵與「大師的建議動作」一起傳給大腦
             await carromBrain.rememberAndTrain(lastAIState, lastAIAction, reward, lastAIExpertAction);
         }
 
@@ -498,6 +495,11 @@ async function checkTurnEndAsync() {
             if (isBackgroundTraining) {
                 bgTrainingCurrent++;
                 document.getElementById('bg-progress-text').innerText = `已完成: ${bgTrainingCurrent} / ${bgTrainingTarget} 局`;
+            }
+            
+            //🔥 將這局的最終出桿數紀錄到折線圖中
+            if (typeof addChartData === 'function') {
+                addChartData(totalTurnsThisGame);
             }
             
             await carromBrain.save();
@@ -713,6 +715,10 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
 
     await carromBrain.save();
     isBackgroundTraining = false;
+    
+    //🔥 閉關結束出關時，一次性更新折線圖，讓玩家看到壯觀的下降曲線
+    if (turnChart) turnChart.update();
+
     document.getElementById('bg-training-screen').style.display = 'none';
     document.querySelector('canvas').style.display = 'block';
     
@@ -787,14 +793,13 @@ class CarromBrain {
         }
     }
 
-    //🔥 漏洞 1 & 2 修正：盤外座標改為 (-1, -1)，並且將球依照「距離」進行智能排序
     getStateArray() {
         const state = [];
         const queen = pucks.find(p => p.render.fillStyle === colorQueen);
         if (queen && queen.position.x !== -100) {
             state.push(queen.position.x / WIDTH, queen.position.y / HEIGHT);
         } else {
-            state.push(-1, -1); //🔥 改為盤外座標
+            state.push(-1, -1);
         }
 
         const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
@@ -802,7 +807,6 @@ class CarromBrain {
         let myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
         let oppPucks = pucks.filter(p => p.render.fillStyle === oppColor && p.position.x !== -100);
 
-        //🔥 特徵工程進化：依據離目標底線的距離排序，讓 AI 永遠先關注最好打的球
         const targetY = currentPlayer === 1 ? 30 : HEIGHT - 30;
         myPucks.sort((a, b) => Math.abs(a.position.y - targetY) - Math.abs(b.position.y - targetY));
         oppPucks.sort((a, b) => Math.abs(a.position.y - targetY) - Math.abs(b.position.y - targetY));
@@ -900,18 +904,15 @@ class CarromBrain {
         });
     }
 
-    //🔥 漏洞 3 修正：導入 Dagger 行為克隆演算法 (Behavioral Cloning)
     async rememberAndTrain(stateArray, actionTaken, reward, expertAction) {
         if (!this.isInitialized) return;
 
         let finalAction = actionTaken;
         
-        //🔥 如果 AI 剛剛犯錯或拿了低分，我們放棄它那愚蠢的決策，把「幾何大師的正確解答」塞入記憶庫
         if (reward < 0 && expertAction) {
             finalAction = expertAction;
-            reward = 1.0; // 既然已經換成大師的解答，這就是一筆值得學習的「正面記憶」
+            reward = 1.0; 
         } else if (reward > 0) {
-            // 原本打進球的好表現，也統一給予標準化的正向權重
             reward = 1.0;
         }
 
@@ -930,7 +931,6 @@ class CarromBrain {
         batch[0] = this.memory[this.memory.length - 1];
 
         const states = batch.map(b => b.state);
-        //🔥 現在記憶庫裡全都是高品質的打擊路線，直接將 action 當成 Target 餵給神經網路學習
         const targetActions = batch.map(b => b.action);
 
         const xs = tf.tensor2d(states);
@@ -956,7 +956,7 @@ carromBrain.init();
 
 function executeAIActionSync() {
     lastAIState = carromBrain.getStateArray();
-    lastAIExpertAction = carromBrain.getExpertAction(); //🔥 擊球前先請大師在旁邊備妥正確答案
+    lastAIExpertAction = carromBrain.getExpertAction(); 
     
     const rawAction = carromBrain.predict(lastAIState);
     lastAIAction = rawAction;
@@ -1004,3 +1004,73 @@ async function customGameLoop() {
     window.requestAnimationFrame(customGameLoop);
 }
 customGameLoop();
+
+//🔥 === 折線圖資料與初始化 ===
+let globalGameCount = 0;
+let turnHistory = [];
+let gameLabels = [];
+let turnChart = null;
+
+function initChart() {
+    const ctx = document.getElementById('turnChart').getContext('2d');
+    
+    // 設定 Chart.js 預設字體顏色為淺色以搭配深色背景
+    Chart.defaults.color = '#bdc3c7';
+    
+    turnChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: gameLabels,
+            datasets: [{
+                label: '單局出桿數 (越低越聰明)',
+                data: turnHistory,
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    display: true, 
+                    title: { display: true, text: '遊戲局數' } 
+                },
+                y: { 
+                    display: true, 
+                    title: { display: true, text: '總出桿數' }, 
+                    beginAtZero: true,
+                    max: 160 // 設定上限 160，因為 150 是強制死局重置的極限
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#ecf0f1' } }
+            }
+        }
+    });
+}
+
+function addChartData(turns) {
+    globalGameCount++;
+    
+    // 最多只保留最新 50 局的紀錄，讓圖表不會因為點太多而變成糊糊的一條線
+    if (gameLabels.length >= 50) {
+        gameLabels.shift();
+        turnHistory.shift();
+    }
+    
+    gameLabels.push(globalGameCount);
+    turnHistory.push(turns);
+    
+    // 為了效能，背景極速訓練時不更新畫面，等出關時再一口氣畫出來
+    if (turnChart && !isBackgroundTraining) {
+        turnChart.update();
+    }
+}
+
+// 啟動時立刻初始化圖表
+initChart();
