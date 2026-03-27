@@ -26,12 +26,16 @@
         .white-icon { background-color: #ecf0f1; border: 1px solid #95a5a6; color: #2c3e50; }
         
         /* 訓練控制面板 (掛機訓練與打包匯出用) */
-        #ml-controls { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; z-index: 100; }
+        #ml-controls { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 15px; z-index: 100; }
         #ml-controls button { padding: 10px 15px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         #btn-self-play { background-color: #e67e22; color: white; }
         #btn-self-play:active { background-color: #d35400; }
         #btn-download { background-color: #3498db; color: white; }
         #btn-download:active { background-color: #2980b9; }
+        
+        /* 速度調整拉桿樣式 */
+        .speed-control { display: flex; align-items: center; gap: 10px; color: white; font-size: 14px; font-weight: bold; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 8px; }
+        input[type=range] { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -55,7 +59,11 @@
     </div>
     
     <div id="ml-controls">
-        <button id="btn-self-play">🤖 啟動 AI 左右互搏 (加速訓練)</button>
+        <button id="btn-self-play">🤖 啟動 AI 左右互搏</button>
+        <div class="speed-control">
+            <span id="speed-label">訓練速度: 10x</span>
+            <input type="range" id="speed-slider" min="1" max="20" value="10" step="1">
+        </div>
         <button id="btn-download">💾 匯出打包 AI 大腦</button>
     </div>
     
