@@ -373,16 +373,15 @@ async function checkTurnEndAsync() {
         totalTurnsThisGame++; 
         
         let isFoulQueen = false;
-        let isGameWon = false; //🔥 新增：遊戲獲勝旗籤
+        let isGameWon = false;
         
         const ownRemaining = currentPlayer === 1 ? blackCount : whiteCount;
         
-        //🔥 判斷皇后的打擊是否合法
         if (pottedQueenThisTurn) {
             if (ownRemaining > 0) {
-                isFoulQueen = true; // 還有自己的球卻打進皇后，犯規！
+                isFoulQueen = true; 
             } else {
-                isGameWon = true;   // 自己的球打完後打進皇后，獲勝！
+                isGameWon = true;   
             }
         }
 
@@ -401,12 +400,11 @@ async function checkTurnEndAsync() {
             if (pottedOwnPieceThisTurn) reward += 10.0; 
             if (pottedStrikerThisTurn) reward -= 10.0; 
             
-            //🔥 更新皇后相關的學習獎勵
             if (pottedQueenThisTurn) {
                 if (ownRemaining > 0) {
-                    reward -= 20.0; // 提早打進皇后，扣除大分教訓 AI
+                    reward -= 20.0; 
                 } else {
-                    reward += 100.0; // 完美絕殺獲勝，給予破表大獎勵！
+                    reward += 100.0; 
                 }
             }
             
@@ -424,7 +422,6 @@ async function checkTurnEndAsync() {
 
         if (isFoul) {
             piecesPottedThisTurn.forEach(p => {
-                //🔥 如果是皇后犯規進洞，將它嚴格擺回棋盤正中央
                 let rx = WIDTH/2 + (Math.random() - 0.5) * 40;
                 let ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
                 
@@ -465,7 +462,6 @@ async function checkTurnEndAsync() {
             pottedOwnPieceThisTurn = false; 
         }
 
-        //🔥 更新球權保留規則：進自己的球「或」合法打進皇后，即可繼續打
         const keepTurn = (pottedOwnPieceThisTurn || isGameWon) && !isFoul;
 
         if (!keepTurn) {
@@ -496,7 +492,6 @@ async function checkTurnEndAsync() {
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
 
-        //🔥 修改重置條件：當有一方真的達成獲勝條件 (打完球且打進皇后)，才重置盤面
         if (isGameWon || totalTurnsThisGame > 150) {
             if (isBackgroundTraining) {
                 bgTrainingCurrent++;
@@ -659,7 +654,7 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
         btn.style.backgroundColor = "#c0392b";
         requestLocalAIPrediction(); 
     } else {
-        btn.innerText = "🤖 啟動畫面互搏";
+        btn.innerText = "🤖 啟掌握面互搏";
         btn.style.backgroundColor = "#e67e22";
     }
 });
@@ -678,6 +673,8 @@ document.getElementById('btn-reset-ai').addEventListener('click', async () => {
     const confirmReset = confirm("確定要刪除 AI 的所有記憶，讓它從頭開始學習嗎？");
     if (confirmReset) {
         localStorage.removeItem('carrom-ai-exploration');
+        //🔥 同步刪除被存入 LocalStorage 的海馬迴記憶
+        localStorage.removeItem('carrom-ai-memory'); 
         try { await tf.io.removeModel('localstorage://carrom-ai-model'); } catch(e) {}
         if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
         alert("記憶已清除！網頁將重新載入。");
@@ -750,7 +747,15 @@ class CarromBrain {
                 if (savedRate !== null) {
                     this.explorationRate = parseFloat(savedRate);
                 }
-                document.getElementById('ml-status').innerText = `本地記憶載入成功！目前探索率: ${Math.round(this.explorationRate * 100)}%`;
+
+                //🔥 讀取經驗回放記憶庫 (海馬迴)
+                const savedMemory = localStorage.getItem('carrom-ai-memory');
+                if (savedMemory !== null) {
+                    this.memory = JSON.parse(savedMemory);
+                    console.log(`成功載入海馬迴：恢復 ${this.memory.length} 筆歷史動作記憶！`);
+                }
+
+                document.getElementById('ml-status').innerText = `本地記憶載入成功！目前探索率: ${Math.round(this.explorationRate * 100)}% (記憶庫: ${this.memory.length})`;
             } catch (e2) {
                 console.log('找不到舊記憶，建立全新 AI 大腦...');
                 this.model = tf.sequential();
@@ -773,6 +778,14 @@ class CarromBrain {
         if (!this.isInitialized) return;
         await this.model.save('localstorage://carrom-ai-model');
         localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
+        
+        //🔥 將最新的 1000 筆海馬迴經驗存入 LocalStorage (避免容量超過瀏覽器 5MB 限制)
+        try {
+            const memoryToSave = this.memory.slice(-1000); 
+            localStorage.setItem('carrom-ai-memory', JSON.stringify(memoryToSave));
+        } catch(e) {
+            console.warn('記憶庫存檔失敗', e);
+        }
     }
 
     getStateArray() {
@@ -809,13 +822,12 @@ class CarromBrain {
         const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
         let myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
         
-        //🔥 如果自己的球打完了，唯一且必殺的目標就變成皇后！
         if (myPucks.length === 0) {
             const queen = pucks.find(p => p.render.fillStyle === colorQueen && p.position.x !== -100);
             if (queen) {
                 myPucks = [queen];
             } else {
-                return [0, 0, 0]; // 皇后若已消失代表遊戲該結束了
+                return [0, 0, 0]; 
             }
         }
 
