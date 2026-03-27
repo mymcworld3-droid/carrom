@@ -146,7 +146,7 @@ let currentPlayer = 1;
 let pottedOwnPieceThisTurn = false;
 let pottedStrikerThisTurn = false;
 let pottedQueenThisTurn = false;
-let hitAnyPuckThisTurn = false; //🔥 追蹤這回合是否打到任何棋子
+let hitAnyPuckThisTurn = false; // 追蹤這回合是否打到任何棋子
 let piecesPottedThisTurn = []; 
 
 // 用於機器學習的狀態追蹤與掛機系統
@@ -156,14 +156,13 @@ let isSelfPlayTraining = false; // 是否開啟 AI 左右互搏模式
 let totalTurnsThisGame = 0; // 記錄打了幾桿，避免死局
 let currentTrainingSpeed = 10; // 記錄當前使用者設定的訓練速度
 
-//🔥 新增：全局碰撞監聽器，確認打擊子有沒有撞到目標
+// 全局碰撞監聽器，確認打擊子有沒有撞到目標
 Events.on(engine, 'collisionStart', (event) => {
     event.pairs.forEach(pair => {
         const { bodyA, bodyB } = pair;
-        // 如果碰撞的雙方是 striker (打擊子) 和 puck (一般棋子/皇后)
         if ((bodyA.label === 'striker' && bodyB.label === 'puck') || 
             (bodyB.label === 'striker' && bodyA.label === 'puck')) {
-            hitAnyPuckThisTurn = true; // 標記為有撞到球
+            hitAnyPuckThisTurn = true; 
         }
     });
 });
@@ -310,7 +309,6 @@ window.addEventListener('pointerup', (e) => {
 
     const forceVector = { x: forceX, y: forceY };
     
-    //🔥 擊球前，重置碰撞追蹤器
     hitAnyPuckThisTurn = false;
     Body.applyForce(striker, striker.position, forceVector);
 
@@ -341,29 +339,24 @@ Events.on(engine, 'afterUpdate', async () => {
             }
         }
 
-        //🔥 判斷是否空杆犯規 (Miss Foul)
         let isFoulMiss = !hitAnyPuckThisTurn;
-        
-        // 將所有犯規合併為一個判定 (洗澡、打錯皇后、空杆)
         let isFoul = isFoulQueen || pottedStrikerThisTurn || isFoulMiss;
 
         // 強化學習獎勵結算
         if ((currentPlayer === 2 || isSelfPlayTraining) && lastAIState && lastAIAction) {
-            let reward = -0.1; // 基礎懲罰，逼迫 AI 趕快進球
-            if (pottedOwnPieceThisTurn) reward += 10.0; // 打進自己的球，大獎勵！
+            let reward = -0.1; // 基礎懲罰
+            if (pottedOwnPieceThisTurn) reward += 10.0; 
             
-            // 各種犯規的嚴厲懲罰
-            if (pottedStrikerThisTurn) reward -= 10.0; // 洗澡
-            if (isFoulQueen) reward -= 10.0; // 違規打進皇后
-            if (isFoulMiss) reward -= 10.0;  //🔥 空杆 (沒碰到球)，扣大分逼迫它去撞球
+            // 犯規懲罰
+            if (pottedStrikerThisTurn) reward -= 10.0; 
+            if (isFoulQueen) reward -= 10.0; 
+            if (isFoulMiss) reward -= 10.0;  
             
-            // 訓練神經網路
             await carromBrain.train(lastAIState, lastAIAction, reward);
         }
 
-        //🔥 如果有任何犯規，執行退球懲罰 (吐出剛剛打進的球，並額外扣除一顆場下的球)
+        // 如果有任何犯規，執行退球懲罰
         if (isFoul) {
-            // 退回這回合不小心打進的球 (通常空杆不會有這情形，但統一寫比較安全)
             piecesPottedThisTurn.forEach(p => {
                 const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
                 const ry = HEIGHT/2 + (Math.random() - 0.5) * 40;
@@ -379,7 +372,6 @@ Events.on(engine, 'afterUpdate', async () => {
                 }
             });
 
-            // 罰球：將對應玩家已經打進洞的球，抓一顆出來擺回中間
             const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
             const penaltyPiece = pucks.find(p => p.render.fillStyle === myColor && p.position.x === -100 && !piecesPottedThisTurn.includes(p));
             
@@ -397,21 +389,19 @@ Events.on(engine, 'afterUpdate', async () => {
                     document.getElementById('white-count').innerText = `x ${whiteCount}`;
                 }
             }
-            pottedOwnPieceThisTurn = false; // 犯規必定無法連續擊球
+            pottedOwnPieceThisTurn = false; 
         }
 
-        // 決定是否保留球權：進自己球 + 沒有任何犯規
         const keepTurn = pottedOwnPieceThisTurn && !isFoul;
 
         if (!keepTurn) {
             currentPlayer = currentPlayer === 1 ? 2 : 1;
         }
 
-        // 回合結束，清除所有的回合標記
         pottedOwnPieceThisTurn = false;
         pottedStrikerThisTurn = false;
         pottedQueenThisTurn = false;
-        hitAnyPuckThisTurn = false; //🔥 重置空杆判定
+        hitAnyPuckThisTurn = false; 
         piecesPottedThisTurn = []; 
         
         const turnIndicator = document.getElementById('turn-indicator');
@@ -430,11 +420,10 @@ Events.on(engine, 'afterUpdate', async () => {
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
 
-        // 死局防護機制：如果有人贏了，或是打了超過 150 桿都沒結束，強制存檔並重置網頁
+        // 死局防護機制
         if (blackCount === 0 || whiteCount === 0 || totalTurnsThisGame > 150) {
             console.log("一局結束，強制存檔並重新載入...");
             await carromBrain.save();
-            // 在網址後方加上參數，讓網頁重整後能自動接續訓練模式
             if(isSelfPlayTraining) {
                 window.location.href = window.location.pathname + `?train=true&speed=${currentTrainingSpeed}`;
             } else {
@@ -444,7 +433,6 @@ Events.on(engine, 'afterUpdate', async () => {
         }
 
         if (currentPlayer === 2 || isSelfPlayTraining) {
-            // 根據使用者設定的速度動態縮短延遲時間，避免發呆
             const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
             setTimeout(requestLocalAIPrediction, delay);
         }
@@ -576,14 +564,12 @@ Events.on(render, 'afterRender', () => {
     }
 });
 
-//🔥 === UI 按鈕與速度控制邏輯 ===
+//🔥 === UI 按鈕與控制邏輯 ===
 
-// 監聽速度調整拉桿
 document.getElementById('speed-slider').addEventListener('input', (e) => {
     currentTrainingSpeed = parseInt(e.target.value);
     document.getElementById('speed-label').innerText = `訓練速度: ${currentTrainingSpeed}x`;
     
-    // 如果正在訓練中，即時套用新速度與防穿牆精度
     if (isSelfPlayTraining) {
         engine.timing.timeScale = currentTrainingSpeed;
         engine.positionIterations = 10 + currentTrainingSpeed * 2;
@@ -591,7 +577,6 @@ document.getElementById('speed-slider').addEventListener('input', (e) => {
     }
 });
 
-// 啟動自我訓練模式
 document.getElementById('btn-self-play').addEventListener('click', () => {
     isSelfPlayTraining = !isSelfPlayTraining;
     const btn = document.getElementById('btn-self-play');
@@ -599,24 +584,21 @@ document.getElementById('btn-self-play').addEventListener('click', () => {
         btn.innerText = "🛑 停止 AI 掛機訓練";
         btn.style.backgroundColor = "#c0392b";
         
-        // 啟動加速物理引擎與防穿牆精確度
         engine.timing.timeScale = currentTrainingSpeed; 
         engine.positionIterations = 10 + currentTrainingSpeed * 2; 
         engine.velocityIterations = 10 + currentTrainingSpeed * 2;
         
-        requestLocalAIPrediction(); // 立刻啟動
+        requestLocalAIPrediction(); 
     } else {
         btn.innerText = "🤖 啟動 AI 左右互搏";
         btn.style.backgroundColor = "#e67e22";
         
-        // 恢復人類正常速度
         engine.timing.timeScale = 1; 
         engine.positionIterations = 10; 
         engine.velocityIterations = 10;
     }
 });
 
-// 打包下載訓練好的大腦
 document.getElementById('btn-download').addEventListener('click', async () => {
     if (!carromBrain.isInitialized) return;
     try {
@@ -627,7 +609,29 @@ document.getElementById('btn-download').addEventListener('click', async () => {
     }
 });
 
-// 檢查網址，決定是否一開網頁就自動接續訓練，並恢復速度
+//🔥 新增：刪除 AI 記憶並重新訓練
+document.getElementById('btn-reset-ai').addEventListener('click', async () => {
+    const confirmReset = confirm("確定要刪除 AI 的所有記憶，讓它從頭開始學習嗎？\n\n注意：這會清空儲存在瀏覽器裡的訓練進度！");
+    if (confirmReset) {
+        // 清除本地儲存的訓練狀態
+        localStorage.removeItem('carrom-ai-exploration');
+        try {
+            await tf.io.removeModel('localstorage://carrom-ai-model');
+        } catch(e) {
+            console.log("本地沒有神經網路模型可刪除");
+        }
+        
+        // 如果正在訓練中，先停止
+        if (isSelfPlayTraining) {
+            document.getElementById('btn-self-play').click();
+        }
+        
+        alert("記憶已清除！網頁將重新載入。");
+        // 拿掉網址裡的 train 參數並重整，確保以最乾淨的狀態重新開始
+        window.location.href = window.location.pathname;
+    }
+});
+
 window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const urlSpeed = urlParams.get('speed');
@@ -645,22 +649,20 @@ window.onload = () => {
 
 class CarromBrain {
     constructor() {
-        this.explorationRate = 1.0; // 初始探索率 (100% 隨機嘗試)
-        this.explorationDecay = 0.995; // 每次打擊後慢慢降低隨機性
-        this.minExploration = 0.05; // 至少保留 5% 的隨機性來尋找新打法
-        this.isInitialized = false; // 標記是否已經準備好
+        this.explorationRate = 1.0; 
+        this.explorationDecay = 0.995; 
+        this.minExploration = 0.05; 
+        this.isInitialized = false; 
     }
 
     async init() {
         try {
-            // 第一優先：嘗試讀取伺服器上的「全球發布版」模型
             this.model = await tf.loadLayersModel('./carrom-ai-model.json');
             console.log('成功載入伺服器上的【全球發布版 AI】！');
             this.explorationRate = 0.05; 
             document.getElementById('ml-status').innerText = `已載入伺服器上的最強大腦！`;
         } catch (e1) {
             try {
-                // 第二優先：讀取本機平板訓練到一半的記憶
                 this.model = await tf.loadLayersModel('localstorage://carrom-ai-model');
                 console.log('成功載入本地先前的 AI 記憶！');
                 
@@ -670,20 +672,15 @@ class CarromBrain {
                 }
                 document.getElementById('ml-status').innerText = `本地記憶載入成功！目前探索率: ${Math.round(this.explorationRate * 100)}%`;
             } catch (e2) {
-                // 如果都沒有，建立全新嬰兒 AI 大腦
                 console.log('找不到舊記憶，建立全新 AI 大腦...');
                 this.model = tf.sequential();
                 
-                // 輸入層：19 顆棋子 * 2 (x,y 座標) + 1 (當前是玩家幾) = 39 個特徵
                 this.model.add(tf.layers.dense({ units: 64, inputShape: [39], activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
-                
-                // 輸出層：3 個數值 (strikerX, forceX, forceY)
                 this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
             }
         }
         
-        // 編譯神經網路
         this.model.compile({
             optimizer: tf.train.adam(0.01),
             loss: 'meanSquaredError'
@@ -692,17 +689,14 @@ class CarromBrain {
         this.isInitialized = true;
     }
 
-    // 自動將記憶存入平板瀏覽器
     async save() {
         if (!this.isInitialized) return;
         await this.model.save('localstorage://carrom-ai-model');
         localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
     }
 
-    // 將物理盤面轉換成神經網路看得懂的陣列
     getStateArray() {
         const state = [];
-        // 1. 放入 19 顆棋子的相對座標
         for (let id = 100; id <= 118; id++) {
             const puck = pucks.find(p => p.id === id);
             if (puck && puck.position.x !== -100) {
@@ -713,16 +707,13 @@ class CarromBrain {
                 state.push(0);
             }
         }
-        // 2. 放入當前是誰在打擊 (1 代表下方，-1 代表上方)，這對互搏非常重要
         state.push(currentPlayer === 1 ? 1 : -1);
         return state;
     }
 
-    // 進行預測或隨機探索
     predict(stateArray) {
-        if (!this.isInitialized) return [0, 0, 0]; // 安全防護
+        if (!this.isInitialized) return [0, 0, 0]; 
 
-        // 擲骰子決定是否探索
         if (Math.random() < this.explorationRate) {
             return [
                 (Math.random() * 2) - 1, 
@@ -731,7 +722,6 @@ class CarromBrain {
             ];
         }
 
-        // 依照智慧推論
         return tf.tidy(() => {
             const inputTensor = tf.tensor2d([stateArray]);
             const prediction = this.model.predict(inputTensor);
@@ -739,7 +729,6 @@ class CarromBrain {
         });
     }
 
-    // 根據獎勵調整權重
     async train(stateArray, actionTaken, reward) {
         if (!this.isInitialized) return;
 
@@ -764,40 +753,32 @@ class CarromBrain {
     }
 }
 
-// 初始化神經網路大腦並載入
 const carromBrain = new CarromBrain();
 carromBrain.init(); 
 
-// 呼叫本機 AI 進行推論並執行
 function requestLocalAIPrediction() {
     lastAIState = carromBrain.getStateArray();
     const rawAction = carromBrain.predict(lastAIState);
     lastAIAction = rawAction;
 
-    // 解碼神經網路輸出，並支援上下兩邊的不同打法
     const aiX = 120 + ((rawAction[0] + 1) / 2) * (480 - 120); 
     const aiForceX = rawAction[1] * 0.8;
     
     let aiForceY = 0;
     let aiStrikerY = 0;
     if (currentPlayer === 1) {
-        // 玩家 1 是從下面往上打，Y 的力道必須是負的
         aiForceY = -0.01 - ((rawAction[2] + 1) / 2) * 0.79; 
         aiStrikerY = HEIGHT * 0.8;
     } else {
-        // 玩家 2 是從上面往下打，Y 的力道必須是正的
         aiForceY = 0.01 + ((rawAction[2] + 1) / 2) * 0.79; 
         aiStrikerY = HEIGHT * 0.2;
     }
 
-    // 移動打擊子
     Body.setPosition(striker, { x: aiX, y: aiStrikerY });
     Body.setVelocity(striker, { x: 0, y: 0 });
 
-    //🔥 擊球前，重置空杆追蹤器
     hitAnyPuckThisTurn = false;
 
-    // 訓練模式下，根據速度動態縮短延遲出桿
     const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
     setTimeout(() => {
         const forceVector = { x: aiForceX, y: aiForceY };
@@ -805,6 +786,6 @@ function requestLocalAIPrediction() {
         
         setTimeout(() => {
             turnActive = true;
-        }, isSelfPlayTraining ? 10 : 50); // 訓練模式下直接標記回合啟動，不再等待
+        }, isSelfPlayTraining ? 10 : 50); 
     }, delay);
 }
