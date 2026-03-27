@@ -907,6 +907,9 @@ class CarromBrain {
     async rememberAndTrain(stateArray, actionTaken, reward, expertAction) {
         if (!this.isInitialized) return;
 
+        //🔥 新增：判斷這桿原本是否有得分 (獲得正向獎勵)
+        const isScoringShot = reward > 0;
+
         let finalAction = actionTaken;
         
         if (reward < 0 && expertAction) {
@@ -916,10 +919,16 @@ class CarromBrain {
             reward = 1.0;
         }
 
-        this.memory.push({ state: stateArray, action: finalAction, reward: reward });
-        if (this.memory.length > this.maxMemory) {
-            this.memory.shift(); 
+        //🔥 修改：海馬迴「只記錄得分的球」，過濾掉所有沒進球的軌跡
+        if (isScoringShot) {
+            this.memory.push({ state: stateArray, action: finalAction, reward: reward });
+            if (this.memory.length > this.maxMemory) {
+                this.memory.shift(); 
+            }
         }
+
+        //🔥 如果記憶庫是空的（還沒進過半顆球），先跳過訓練避免報錯
+        if (this.memory.length === 0) return;
 
         const batchSize = Math.min(this.memory.length, this.batchSize);
         const batch = [];
@@ -928,7 +937,10 @@ class CarromBrain {
             batch.push(this.memory[randomIndex]);
         }
         
-        batch[0] = this.memory[this.memory.length - 1];
+        //🔥 如果這局有進球，才把它放在 batch[0] 強制複習最新成功的經驗
+        if (isScoringShot) {
+            batch[0] = this.memory[this.memory.length - 1];
+        }
 
         const states = batch.map(b => b.state);
         const targetActions = batch.map(b => b.action);
