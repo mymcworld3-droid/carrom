@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>克朗棋 (單機對戰版)</title>
+    <title>克朗棋 (ML 神經網路訓練版)</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; display: flex; justify-content: center; align-items: center; height: 100vh; color: #ecf0f1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
         canvas { box-shadow: 0 15px 30px rgba(0,0,0,0.6); border-radius: 8px; }
@@ -12,6 +12,9 @@
         #ui p { margin: 5px 0; font-size: 14px; color: #bdc3c7; }
         
         #turn-indicator { font-size: 18px; font-weight: bold; margin-bottom: 15px !important; color: #2ecc71; }
+        
+        /* 新增：ML 訓練狀態顯示器 */
+        #ml-status { font-size: 12px; color: #3498db; margin-top: 10px; }
 
         /* 右側計分板樣式 */
         #scoreboard { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
@@ -25,10 +28,11 @@
 </head>
 <body>
     <div id="ui">
-        <h3>克朗棋 (單機對戰版)</h3>
+        <h3>克朗棋 (ML 神經網路訓練版)</h3>
         <p id="turn-indicator">現在輪到：玩家 1 (下方，黑棋)</p>
         <p>拖曳擊打紅色打擊子 (Striker)</p>
         <p>點擊底線空白處可平移紅球</p>
+        <div id="ml-status">AI 探索率: 100% (完全隨機)</div>
     </div>
 
     <div id="scoreboard">
@@ -41,12 +45,10 @@
             <span id="white-count">x 9</span>
         </div>
     </div>
-    <div id="error-toast" style="display: none; position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background-color: #e74c3c; color: white; padding: 15px 25px; border-radius: 8px; font-weight: bold; z-index: 9999; box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-align: center; max-width: 80%;">
-        錯誤訊息
-    </div>
     
     <script src="/socket.io/socket.io.js"></script> 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="game.js"></script>    
 </body>
 </html>
