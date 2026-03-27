@@ -10,10 +10,10 @@ const potSound = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_13334
 
 // 1. 初始化物理引擎
 const engine = Engine.create({
-    positionIterations: 10, // 提高精確度，防止高速穿透
+    positionIterations: 10,
     velocityIterations: 10
 });
-engine.world.gravity.y = 0; // 俯視圖，無重力
+engine.world.gravity.y = 0;
 
 // 2. 初始化渲染器
 const render = Render.create({
@@ -22,10 +22,9 @@ const render = Render.create({
     options: {
         width: WIDTH,
         height: HEIGHT,
-        wireframes: false, // 顯示實心物體
-        background: '#e0c097', // 木質棋盤色
+        wireframes: false,
+        background: '#e0c097',
         showAngleIndicator: false,
-        // 啟用自定義渲染，這樣我們才能自己動手畫更好看的元素
         hasBounds: true
     }
 });
@@ -35,20 +34,16 @@ const runner = Runner.create();
 Runner.run(runner, engine);
 
 // 3. 建立棋盤邊界 (牆壁) 與 球洞 (Pockets)
-const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 }; // 將摩擦力 friction 設為 0
+const wallOptions = { isStatic: true, render: { fillStyle: '#5d4037' }, restitution: 0.6, friction: 0 };
 
-// 加厚牆壁厚度到 100px 並向外偏移。畫面上看起來一樣是 20px 的邊框，但物理上是一堵厚牆，徹底防止高速穿透
 const walls = [
-    Bodies.rectangle(WIDTH/2, -30, WIDTH + 200, 100, wallOptions), // 上
-    Bodies.rectangle(WIDTH/2, HEIGHT + 30, WIDTH + 200, 100, wallOptions), // 下
-    Bodies.rectangle(-30, HEIGHT/2, 100, HEIGHT + 200, wallOptions), // 左
-    Bodies.rectangle(WIDTH + 30, HEIGHT/2, 100, HEIGHT + 200, wallOptions) // 右
+    Bodies.rectangle(WIDTH/2, -30, WIDTH + 200, 100, wallOptions),
+    Bodies.rectangle(WIDTH/2, HEIGHT + 30, WIDTH + 200, 100, wallOptions),
+    Bodies.rectangle(-30, HEIGHT/2, 100, HEIGHT + 200, wallOptions),
+    Bodies.rectangle(WIDTH + 30, HEIGHT/2, 100, HEIGHT + 200, wallOptions)
 ];
 
-// 建立四個角落的球洞
 const pocketRadius = 30;
-// 給球洞加一點內部陰影效果， label 用來辨識球洞
-// 這裡將球洞標記為 Sensor，不進行實體碰撞，我們將轉為手動判定嚴格進洞
 const pocketOptions = { isStatic: true, isSensor: true, label: 'pocket', render: { fillStyle: '#1a1a1a' } };
 const pockets = [
     Bodies.circle(30, 30, pocketRadius, pocketOptions),
@@ -58,12 +53,10 @@ const pockets = [
 ];
 
 // 4. 建立棋子
-
-// 定義棋子外觀顏色
-const colorQueen = '#d35400'; // 皇后
-const colorWhite = '#ecf0f1'; // 白棋
-const colorBlack = '#2c3e50'; // 黑棋
-const colorStriker = '#c0392b'; // 打擊子
+const colorQueen = '#d35400';
+const colorWhite = '#ecf0f1';
+const colorBlack = '#2c3e50';
+const colorStriker = '#c0392b';
 
 const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, { 
     label: 'striker',
@@ -71,6 +64,7 @@ const striker = Bodies.circle(WIDTH/2, HEIGHT * 0.8, 20, {
     frictionAir: 0.008, 
     friction: 0.01,     
     mass: 15, 
+    isBullet: true, // 絕對防止母球高速穿牆
     render: { 
         visible: false, 
         fillStyle: colorStriker, 
@@ -91,17 +85,18 @@ const puckOptions = {
     restitution: 0.8, 
     frictionAir: 0.004, 
     friction: 0.01,     
-    mass: 5 
+    mass: 5,
+    isBullet: true // 防止子球被撞飛出界
 };
 
-// 中心皇后 (id: 100)
+// 中心皇后
 pucks.push(Bodies.circle(cx, cy, puckRadius, { 
     ...puckOptions, 
     id: puckId++, 
     render: { visible: false, fillStyle: colorQueen, strokeStyle: '#e67e22', lineWidth: 1 }
 }));
 
-// 內圈 (id: 101~106)
+// 內圈
 for (let i = 0; i < 6; i++) {
     const angle = (i * Math.PI) / 3;
     const x = cx + Math.cos(angle) * gap;
@@ -114,7 +109,7 @@ for (let i = 0; i < 6; i++) {
     }));
 }
 
-// 外圈 (id: 107~118)
+// 外圈
 for (let i = 0; i < 12; i++) {
     const angle = (i * Math.PI) / 6;
     let dist, color;
@@ -149,14 +144,12 @@ let pottedQueenThisTurn = false;
 let hitAnyPuckThisTurn = false; 
 let piecesPottedThisTurn = []; 
 
-// 用於機器學習的狀態追蹤與掛機系統
+// 狀態追蹤與掛機系統
 let lastAIState = null;
 let lastAIAction = null;
 let isSelfPlayTraining = false; 
 let totalTurnsThisGame = 0; 
 let currentTrainingSpeed = 10; 
-
-//🔥 新增：背景極速訓練專用變數
 let isBackgroundTraining = false;
 let bgTrainingTarget = 0;
 let bgTrainingCurrent = 0;
@@ -172,7 +165,7 @@ Events.on(engine, 'collisionStart', (event) => {
     });
 });
 
-// 5. 處理嚴格進洞邏輯 (每個物理 Tick 都會執行)
+// 5. 處理嚴格進洞邏輯
 Events.on(engine, 'afterUpdate', () => {
     pucks.forEach(piece => {
         if (piece.position.x === -100) return;
@@ -239,7 +232,6 @@ Events.on(engine, 'afterUpdate', () => {
         }
     });
 
-    //🔥 在正常遊戲模式下，每一幀檢查回合是否結束
     if (!isBackgroundTraining) {
         checkTurnEndAsync();
     }
@@ -327,7 +319,7 @@ window.addEventListener('pointerup', (e) => {
     }, 50);
 });
 
-//🔥 新增：瞬間重置盤面功能 (避免重新載入網頁拖慢訓練)
+// 瞬間重置盤面
 function resetGame() {
     blackCount = 9;
     whiteCount = 9;
@@ -345,7 +337,6 @@ function resetGame() {
     document.getElementById('black-count').innerText = `x ${blackCount}`;
     document.getElementById('white-count').innerText = `x ${whiteCount}`;
 
-    // 將所有棋子依照初始排法放回中間
     const queen = pucks.find(p => p.id === 100);
     Body.setPosition(queen, { x: cx, y: cy });
     Body.setVelocity(queen, { x: 0, y: 0 });
@@ -369,7 +360,7 @@ function resetGame() {
     Body.setVelocity(striker, { x: 0, y: 0 });
 }
 
-//🔥 將原本的在 afterUpdate 中的回合結算，獨立成非同步函式，以便背景訓練能完美等待
+// 結算回合
 async function checkTurnEndAsync() {
     let anyMoving = false;
     if (striker.speed > 0.1) anyMoving = true;
@@ -380,7 +371,7 @@ async function checkTurnEndAsync() {
     isMoving = anyMoving;
 
     if (!isMoving && turnActive) {
-        turnActive = false; // 鎖定狀態，避免重複進入
+        turnActive = false; 
         totalTurnsThisGame++; 
         
         let isFoulQueen = false;
@@ -396,16 +387,16 @@ async function checkTurnEndAsync() {
 
         // 強化學習獎勵結算
         if ((currentPlayer === 2 || isSelfPlayTraining || isBackgroundTraining) && lastAIState && lastAIAction) {
-            let reward = -0.1; 
-            if (pottedOwnPieceThisTurn) reward += 10.0; 
-            if (pottedStrikerThisTurn) reward -= 10.0; 
-            if (isFoulQueen) reward -= 10.0; 
-            if (isFoulMiss) reward -= 10.0;  
+            let reward = -0.1; // 基礎懲罰
+            if (pottedOwnPieceThisTurn) reward += 10.0; // 打進自己的球
+            if (pottedStrikerThisTurn) reward -= 10.0; // 洗澡
+            if (isFoulQueen) reward -= 10.0; // 違規打進皇后
+            if (isFoulMiss) reward -= 5.0;  // 空杆
             
-            await carromBrain.train(lastAIState, lastAIAction, reward);
+            // 提交給記憶庫並訓練
+            await carromBrain.rememberAndTrain(lastAIState, lastAIAction, reward);
         }
 
-        // 如果有犯規，執行退球懲罰
         if (isFoul) {
             piecesPottedThisTurn.forEach(p => {
                 const rx = WIDTH/2 + (Math.random() - 0.5) * 40;
@@ -454,7 +445,6 @@ async function checkTurnEndAsync() {
         hitAnyPuckThisTurn = false; 
         piecesPottedThisTurn = []; 
         
-        // UI 更新 (背景模式下跳過以節省效能)
         if (!isBackgroundTraining) {
             const turnIndicator = document.getElementById('turn-indicator');
             if (isSelfPlayTraining) {
@@ -462,10 +452,10 @@ async function checkTurnEndAsync() {
                 turnIndicator.style.color = "#f39c12";
             } else if (currentPlayer === 1) {
                 turnIndicator.innerText = "現在輪到：玩家 1 (下方，黑棋)";
-                turnIndicator.style.color = "#2ecc71"; // 綠色
+                turnIndicator.style.color = "#2ecc71"; 
             } else {
                 turnIndicator.innerText = "現在輪到：AI 神經網路 (思考中...)";
-                turnIndicator.style.color = "#e74c3c"; // 紅色
+                turnIndicator.style.color = "#e74c3c"; 
             }
         }
 
@@ -473,18 +463,15 @@ async function checkTurnEndAsync() {
         Body.setPosition(striker, { x: WIDTH/2, y: resetY });
         Body.setVelocity(striker, { x: 0, y: 0 });
 
-        // 死局防護機制與重置
         if (blackCount === 0 || whiteCount === 0 || totalTurnsThisGame > 150) {
-            // 背景模式下，這裡只負責存檔與加總
             if (isBackgroundTraining) {
                 bgTrainingCurrent++;
                 document.getElementById('bg-progress-text').innerText = `已完成: ${bgTrainingCurrent} / ${bgTrainingTarget} 局`;
             } else {
                 await carromBrain.save();
             }
-            resetGame(); // 瞬間重置盤面，不用重新整理網頁！
+            resetGame(); 
             
-            // 正常模式重置後繼續觸發下一桿
             if (!isBackgroundTraining && (isSelfPlayTraining || currentPlayer === 2)) {
                 const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
                 setTimeout(requestLocalAIPrediction, delay);
@@ -492,7 +479,6 @@ async function checkTurnEndAsync() {
             return;
         }
 
-        // 正常繼續下一桿
         if (!isBackgroundTraining && (currentPlayer === 2 || isSelfPlayTraining)) {
             const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
             setTimeout(requestLocalAIPrediction, delay);
@@ -625,8 +611,7 @@ Events.on(render, 'afterRender', () => {
     }
 });
 
-//🔥 === UI 按鈕與控制邏輯 ===
-
+// UI 按鈕與控制邏輯
 document.getElementById('speed-slider').addEventListener('input', (e) => {
     currentTrainingSpeed = parseInt(e.target.value);
     document.getElementById('speed-label').innerText = `畫面速度: ${currentTrainingSpeed}x`;
@@ -681,55 +666,44 @@ document.getElementById('btn-reset-ai').addEventListener('click', async () => {
     }
 });
 
-//🔥 新增：啟動背景極速訓練 500 局
 document.getElementById('btn-bg-train').addEventListener('click', async () => {
     if (isBackgroundTraining) return;
     isBackgroundTraining = true;
     bgTrainingTarget = 500;
     bgTrainingCurrent = 0;
     
-    // 關閉原本的畫面互搏
     if (isSelfPlayTraining) document.getElementById('btn-self-play').click();
 
-    // 顯示遮罩、停止渲染與預設引擎迴圈
     document.getElementById('bg-training-screen').style.display = 'flex';
     document.querySelector('canvas').style.display = 'none';
     Render.stop(render);
     Runner.stop(runner);
 
-    // 大幅提高物理精確度，因為背景運算沒有視覺限制
     engine.positionIterations = 20;
     engine.velocityIterations = 20;
 
     resetGame();
 
     let ticks = 0;
-    //🔥 核心迴圈：完全脫離 setTimeout，CPU 全速運轉
     while (bgTrainingCurrent < bgTrainingTarget) {
         if (!isMoving && !turnActive) {
             executeAIActionSync();
         }
 
-        // 手動推進物理時間 (每次推進約 16 毫秒)
         Engine.update(engine, 16.666);
-        
-        // 手動等待並結算回合
         await checkTurnEndAsync();
 
         ticks++;
-        // 每運算 100 幀 (約等於物理世界過了 1.6 秒)，釋放一次主執行緒，避免瀏覽器當機
         if (ticks % 100 === 0) {
             await new Promise(r => setTimeout(r, 0)); 
         }
     }
 
-    // 訓練結束，存檔並恢復畫面
     await carromBrain.save();
     isBackgroundTraining = false;
     document.getElementById('bg-training-screen').style.display = 'none';
     document.querySelector('canvas').style.display = 'block';
     
-    // 恢復正常物理引擎設定並重置
     engine.positionIterations = 10;
     engine.velocityIterations = 10;
     resetGame();
@@ -740,7 +714,7 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
 });
 
 
-//🔥 === TensorFlow.js 本機機器學習 AI 大腦 ===
+//🔥 === TensorFlow.js 終極神經網路 (完整版) ===
 
 class CarromBrain {
     constructor() {
@@ -748,6 +722,12 @@ class CarromBrain {
         this.explorationDecay = 0.995; 
         this.minExploration = 0.05; 
         this.isInitialized = false; 
+        
+        //🔥 1. 經驗回放記憶庫 (Experience Replay Buffer)
+        // 解決神經網路「學了就忘」的健忘症
+        this.memory = [];
+        this.maxMemory = 2000;
+        this.batchSize = 32;
     }
 
     async init() {
@@ -770,6 +750,7 @@ class CarromBrain {
                 console.log('找不到舊記憶，建立全新 AI 大腦...');
                 this.model = tf.sequential();
                 
+                // 39 維：皇后(2) + 目標球(18) + 障礙球(18) + 玩家(1)
                 this.model.add(tf.layers.dense({ units: 64, inputShape: [39], activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
@@ -790,33 +771,102 @@ class CarromBrain {
         localStorage.setItem('carrom-ai-exploration', this.explorationRate.toString());
     }
 
+    // 視角轉換特徵工程：將棋盤整理成 AI 最容易理解的樣子
     getStateArray() {
         const state = [];
-        for (let id = 100; id <= 118; id++) {
-            const puck = pucks.find(p => p.id === id);
-            if (puck && puck.position.x !== -100) {
-                state.push(puck.position.x / WIDTH);
-                state.push(puck.position.y / HEIGHT);
-            } else {
-                state.push(0);
-                state.push(0);
-            }
+        const queen = pucks.find(p => p.render.fillStyle === colorQueen);
+        if (queen && queen.position.x !== -100) {
+            state.push(queen.position.x / WIDTH, queen.position.y / HEIGHT);
+        } else {
+            state.push(0, 0);
         }
+
+        const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
+        const oppColor = currentPlayer === 1 ? colorWhite : colorBlack;
+        const myPucks = pucks.filter(p => p.render.fillStyle === myColor);
+        const oppPucks = pucks.filter(p => p.render.fillStyle === oppColor);
+
+        for (let i = 0; i < 9; i++) {
+            if (myPucks[i] && myPucks[i].position.x !== -100) {
+                state.push(myPucks[i].position.x / WIDTH, myPucks[i].position.y / HEIGHT);
+            } else { state.push(0, 0); }
+        }
+
+        for (let i = 0; i < 9; i++) {
+            if (oppPucks[i] && oppPucks[i].position.x !== -100) {
+                state.push(oppPucks[i].position.x / WIDTH, oppPucks[i].position.y / HEIGHT);
+            } else { state.push(0, 0); }
+        }
+
         state.push(currentPlayer === 1 ? 1 : -1);
         return state;
+    }
+
+    //🔥 2. 專家導師系統 (Math Radar)
+    // 算出完美幾何角度，帶領 AI 快速學會打球
+    getExpertAction() {
+        const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
+        const myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
+        
+        if (myPucks.length === 0) return [0, 0, 0]; // 沒球可打
+
+        // 目標球洞
+        const pocketY = currentPlayer === 1 ? 30 : HEIGHT - 30;
+        const leftPocket = {x: 30, y: pocketY};
+        const rightPocket = {x: WIDTH - 30, y: pocketY};
+
+        let bestPuck = myPucks[0];
+        let minDist = 99999;
+        let targetPocket = leftPocket;
+
+        // 找出離洞口最近的球
+        myPucks.forEach(p => {
+            const dLeft = Vector.magnitude(Vector.sub(p.position, leftPocket));
+            const dRight = Vector.magnitude(Vector.sub(p.position, rightPocket));
+            if (dLeft < minDist) { minDist = dLeft; bestPuck = p; targetPocket = leftPocket; }
+            if (dRight < minDist) { minDist = dRight; bestPuck = p; targetPocket = rightPocket; }
+        });
+
+        // 計算切角位置
+        const dx = targetPocket.x - bestPuck.position.x;
+        const offset = dx > 0 ? -12 : 12; // 打對面才能把球擠進洞裡
+        let idealStrikerX = bestPuck.position.x + offset;
+        idealStrikerX = Math.max(120, Math.min(480, idealStrikerX));
+
+        const forceX = dx > 0 ? 0.3 : -0.3;
+        const forceY = 0.6; // 固定往前推
+
+        // 轉換回神經網路的 [-1, 1] 輸出格式
+        const nnX = ((idealStrikerX - 120) / (480 - 120)) * 2 - 1;
+        const nnForceX = forceX / 0.8;
+        const nnForceY = ((forceY - 0.01) / 0.79) * 2 - 1;
+
+        // 加入些微隨機雜訊，讓 AI 學會應付不同狀況，而不是死背
+        return [
+            nnX + (Math.random() * 0.2 - 0.1),
+            nnForceX + (Math.random() * 0.2 - 0.1),
+            nnForceY + (Math.random() * 0.2 - 0.1)
+        ].map(v => Math.max(-1, Math.min(1, v)));
     }
 
     predict(stateArray) {
         if (!this.isInitialized) return [0, 0, 0]; 
 
+        // 探索階段：啟動專家模仿學習
         if (Math.random() < this.explorationRate) {
-            return [
-                (Math.random() * 2) - 1, 
-                (Math.random() * 2) - 1, 
-                (Math.random() * 2) - 1  
-            ];
+            // 70% 靠專家數學雷達示範神仙球，30% 瞎猜發掘新招式
+            if (Math.random() < 0.7) {
+                return this.getExpertAction();
+            } else {
+                return [
+                    (Math.random() * 2) - 1, 
+                    (Math.random() * 2) - 1, 
+                    (Math.random() * 2) - 1  
+                ];
+            }
         }
 
+        // 純神經網路大腦推論
         return tf.tidy(() => {
             const inputTensor = tf.tensor2d([stateArray]);
             const prediction = this.model.predict(inputTensor);
@@ -824,17 +874,40 @@ class CarromBrain {
         });
     }
 
-    async train(stateArray, actionTaken, reward) {
+    //🔥 3. 結合記憶庫的批次訓練 (Batch Training)
+    async rememberAndTrain(stateArray, actionTaken, reward) {
         if (!this.isInitialized) return;
 
-        const targetAction = actionTaken.map(a => {
-            let adjustment = a + (reward * 0.1 * a);
-            return Math.max(-1, Math.min(1, adjustment)); 
+        // 將剛發生的經驗存入大腦
+        this.memory.push({ state: stateArray, action: actionTaken, reward: reward });
+        if (this.memory.length > this.maxMemory) {
+            this.memory.shift(); // 記憶滿了就忘記最舊的
+        }
+
+        // 從記憶中隨機挑選 32 筆經驗出來覆習
+        const batchSize = Math.min(this.memory.length, this.batchSize);
+        const batch = [];
+        for (let i = 0; i < batchSize; i++) {
+            const randomIndex = Math.floor(Math.random() * this.memory.length);
+            batch.push(this.memory[randomIndex]);
+        }
+        
+        // 確保剛發生的事情一定會被覆習到
+        batch[0] = this.memory[this.memory.length - 1];
+
+        // 準備 TensorFlow 訓練資料
+        const states = batch.map(b => b.state);
+        const targetActions = batch.map(b => {
+            return b.action.map(a => {
+                let adjustment = a + (b.reward * 0.1 * a);
+                return Math.max(-1, Math.min(1, adjustment)); 
+            });
         });
 
-        const xs = tf.tensor2d([stateArray]);
-        const ys = tf.tensor2d([targetAction]);
+        const xs = tf.tensor2d(states);
+        const ys = tf.tensor2d(targetActions);
 
+        // 進行批次訓練
         await this.model.fit(xs, ys, { epochs: 1, verbose: 0 });
 
         xs.dispose();
@@ -845,7 +918,7 @@ class CarromBrain {
         }
 
         if(!isBackgroundTraining) {
-            document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (上次獎勵: ${reward})`;
+            document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (記憶庫: ${this.memory.length})`;
         }
     }
 }
@@ -853,7 +926,6 @@ class CarromBrain {
 const carromBrain = new CarromBrain();
 carromBrain.init(); 
 
-//🔥 新增：同步執行 AI 動作 (完全去除 setTimeout，專為背景極速模式打造)
 function executeAIActionSync() {
     lastAIState = carromBrain.getStateArray();
     const rawAction = carromBrain.predict(lastAIState);
@@ -883,7 +955,6 @@ function executeAIActionSync() {
     turnActive = true;
 }
 
-// 正常畫面的 AI 預測呼叫 (保有視覺延遲)
 function requestLocalAIPrediction() {
     const delay = isSelfPlayTraining ? Math.max(1, 50 / currentTrainingSpeed) : 500;
     setTimeout(() => {
