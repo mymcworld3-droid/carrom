@@ -727,7 +727,7 @@ document.getElementById('btn-bg-train').addEventListener('click', async () => {
 });
 
 
-// TensorFlow.js 神經網路大腦
+// TensorFlow.js 神經網路大腦 (🔥 全新升級：Raycast 射線智能大師 + 行為克隆架構)
 class CarromBrain {
     constructor() {
         this.explorationRate = 1.0; 
@@ -766,14 +766,17 @@ class CarromBrain {
                 console.log('找不到舊記憶，建立全新 AI 大腦...');
                 this.model = tf.sequential();
                 
-                this.model.add(tf.layers.dense({ units: 64, inputShape: [39], activation: 'relu' }));
+                // 加深神經網路層數，讓它能理解更複雜的幾何避障
+                this.model.add(tf.layers.dense({ units: 128, inputShape: [39], activation: 'relu' }));
+                this.model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
                 this.model.add(tf.layers.dense({ units: 3, activation: 'tanh' })); 
             }
         }
         
+        //🔥 使用更適合回歸任務的優化器參數
         this.model.compile({
-            optimizer: tf.train.adam(0.01),
+            optimizer: tf.train.adam(0.005),
             loss: 'meanSquaredError'
         });
 
@@ -827,6 +830,7 @@ class CarromBrain {
         return state;
     }
 
+    //🔥 全新進化：具備物理射線檢測的智能導師
     getExpertAction() {
         const myColor = currentPlayer === 1 ? colorBlack : colorWhite;
         let myPucks = pucks.filter(p => p.render.fillStyle === myColor && p.position.x !== -100);
@@ -836,61 +840,93 @@ class CarromBrain {
             if (queen) {
                 myPucks = [queen];
             } else {
-                return [0, 0, 0]; 
+                return null; // 沒球可打，回傳 null
             }
         }
 
-        if (myPucks.length === 0) return [0, 0, 0];
+        if (myPucks.length === 0) return null;
 
         const pocketY = currentPlayer === 1 ? 30 : HEIGHT - 30;
         const leftPocket = {x: 30, y: pocketY};
         const rightPocket = {x: WIDTH - 30, y: pocketY};
+        const strikerLineY = currentPlayer === 1 ? HEIGHT * 0.8 : HEIGHT * 0.2;
 
-        let bestPuck = myPucks[0];
-        let minDist = 99999;
-        let targetPocket = leftPocket;
+        // 收集所有盤面上可能成為障礙物的球
+        const activeObstacles = pucks.filter(p => p.position.x !== -100);
 
-        myPucks.forEach(p => {
-            const dLeft = Vector.magnitude(Vector.sub(p.position, leftPocket));
-            const dRight = Vector.magnitude(Vector.sub(p.position, rightPocket));
-            if (dLeft < minDist) { minDist = dLeft; bestPuck = p; targetPocket = leftPocket; }
-            if (dRight < minDist) { minDist = dRight; bestPuck = p; targetPocket = rightPocket; }
-        });
+        // 遍歷所有自己的球，尋找「沒有被擋住」的完美路線
+        for (let p of myPucks) {
+            const targets = [leftPocket, rightPocket];
+            
+            for (let pocket of targets) {
+                // 1. 檢查【子球到洞口】是否被擋住
+                const rayToPocket = Matter.Query.ray(activeObstacles, p.position, pocket);
+                // 過濾掉射線掃到自己這顆球的干擾
+                const obstaclesToPocket = rayToPocket.filter(hit => hit.body.id !== p.id);
+                
+                if (obstaclesToPocket.length === 0) {
+                    // 2. 計算所需的打擊子座標
+                    const dx = pocket.x - p.position.x;
+                    const offset = dx > 0 ? -12 : 12; 
+                    let idealStrikerX = p.position.x + offset;
+                    
+                    // 如果這顆球太靠邊，導致打擊子會超出發球線，放棄這條路線
+                    if (idealStrikerX < 120 || idealStrikerX > 480) continue;
+                    
+                    const strikerStartPos = { x: idealStrikerX, y: strikerLineY };
 
-        const dx = targetPocket.x - bestPuck.position.x;
-        const offset = dx > 0 ? -12 : 12; 
-        let idealStrikerX = bestPuck.position.x + offset;
-        idealStrikerX = Math.max(120, Math.min(480, idealStrikerX));
+                    // 3. 檢查【打擊子到子球】是否被擋住
+                    const rayToPuck = Matter.Query.ray(activeObstacles, strikerStartPos, p.position);
+                    const obstaclesToPuck = rayToPuck.filter(hit => hit.body.id !== p.id);
 
-        const forceX = dx > 0 ? 0.3 : -0.3;
-        const forceY = 0.6; 
+                    // 如果兩段路徑都暢通無阻，這就是一個 100% 完美的必進神仙球！
+                    if (obstaclesToPuck.length === 0) {
+                        const forceX = dx > 0 ? 0.3 : -0.3;
+                        const forceY = currentPlayer === 1 ? -0.6 : 0.6; // 根據玩家決定往前打的方向
 
-        const nnX = ((idealStrikerX - 120) / (480 - 120)) * 2 - 1;
-        const nnForceX = forceX / 0.8;
-        const nnForceY = ((forceY - 0.01) / 0.79) * 2 - 1;
+                        const nnX = ((idealStrikerX - 120) / (480 - 120)) * 2 - 1;
+                        const nnForceX = forceX / 0.8;
+                        let nnForceY = 0;
+                        if (currentPlayer === 1) {
+                            nnForceY = ((forceY + 0.01) / -0.79) * 2 - 1;
+                        } else {
+                            nnForceY = ((forceY - 0.01) / 0.79) * 2 - 1;
+                        }
 
-        return [
-            nnX + (Math.random() * 0.2 - 0.1),
-            nnForceX + (Math.random() * 0.2 - 0.1),
-            nnForceY + (Math.random() * 0.2 - 0.1)
-        ].map(v => Math.max(-1, Math.min(1, v)));
+                        // 回傳大師計算出的完美張量
+                        return [
+                            Math.max(-1, Math.min(1, nnX)),
+                            Math.max(-1, Math.min(1, nnForceX)),
+                            Math.max(-1, Math.min(1, nnForceY))
+                        ];
+                    }
+                }
+            }
+        }
+        
+        // 如果所有球都被擋死，大師也無能為力，回傳 null 讓 AI 自己隨機摸索
+        return null;
     }
 
     predict(stateArray) {
         if (!this.isInitialized) return [0, 0, 0]; 
 
+        // 探索階段：優先讓雷達大師上場
         if (Math.random() < this.explorationRate) {
-            if (Math.random() < 0.7) {
-                return this.getExpertAction();
-            } else {
-                return [
-                    (Math.random() * 2) - 1, 
-                    (Math.random() * 2) - 1, 
-                    (Math.random() * 2) - 1  
-                ];
+            if (Math.random() < 0.8) { // 提高大師出手機率至 80%
+                const expertAction = this.getExpertAction();
+                // 如果大師算得出完美軌跡就照做，算不出就亂打
+                if (expertAction) return expertAction;
             }
+            
+            return [
+                (Math.random() * 2) - 1, 
+                (Math.random() * 2) - 1, 
+                (Math.random() * 2) - 1  
+            ];
         }
 
+        // 神經網路預測階段
         return tf.tidy(() => {
             const inputTensor = tf.tensor2d([stateArray]);
             const prediction = this.model.predict(inputTensor);
@@ -904,31 +940,30 @@ class CarromBrain {
         });
     }
 
+    //🔥 全新訓練邏輯：真正的行為克隆 (Behavioral Cloning)
     async rememberAndTrain(stateArray, actionTaken, reward, expertAction) {
         if (!this.isInitialized) return;
 
-        //🔥 新增：判斷這桿原本是否有得分 (獲得正向獎勵)
-        const isScoringShot = reward > 0;
-
-        let finalAction = actionTaken;
+        let finalTargetAction = null;
         
-        if (reward < 0 && expertAction) {
-            finalAction = expertAction;
-            reward = 1.0; 
-        } else if (reward > 0) {
-            reward = 1.0;
+        // 1. 過濾優質記憶：
+        // 只有在「真的進球了 (reward > 0)」或者「雖然沒進球，但大師算出了完美解法」時，才存入海馬迴。
+        if (reward > 0) {
+            finalTargetAction = actionTaken; // 這次亂猜猜中了，記下來
+        } else if (expertAction !== null) {
+            finalTargetAction = expertAction; // 這次打爛了，但大師有提供正解，記下正解
         }
 
-        //🔥 修改：海馬迴「只記錄得分的球」，過濾掉所有沒進球的軌跡
-        if (isScoringShot) {
-            this.memory.push({ state: stateArray, action: finalAction, reward: reward });
+        // 如果這是一次毫無價值的瞎打（沒進球，且大師也算不出解法），直接拋棄這段記憶，不浪費算力
+        if (finalTargetAction !== null) {
+            this.memory.push({ state: stateArray, action: finalTargetAction });
             if (this.memory.length > this.maxMemory) {
                 this.memory.shift(); 
             }
         }
 
-        //🔥 如果記憶庫是空的（還沒進過半顆球），先跳過訓練避免報錯
-        if (this.memory.length === 0) return;
+        // 記憶庫不夠大時先不訓練，避免過度擬合早期垃圾資料
+        if (this.memory.length < 10) return;
 
         const batchSize = Math.min(this.memory.length, this.batchSize);
         const batch = [];
@@ -937,17 +972,19 @@ class CarromBrain {
             batch.push(this.memory[randomIndex]);
         }
         
-        //🔥 如果這局有進球，才把它放在 batch[0] 強制複習最新成功的經驗
-        if (isScoringShot) {
+        // 如果剛才存了新記憶，強迫第一筆一定要複習剛才的經驗
+        if (finalTargetAction !== null) {
             batch[0] = this.memory[this.memory.length - 1];
         }
 
         const states = batch.map(b => b.state);
+        //🔥 現在的 Target 就是純粹的大師解答，MSE Loss 會運作得極度完美
         const targetActions = batch.map(b => b.action);
 
         const xs = tf.tensor2d(states);
         const ys = tf.tensor2d(targetActions);
 
+        // 訓練神經網路逼近完美答案
         await this.model.fit(xs, ys, { epochs: 1, verbose: 0 });
 
         xs.dispose();
@@ -958,7 +995,7 @@ class CarromBrain {
         }
 
         if(!isBackgroundTraining) {
-            document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (記憶庫: ${this.memory.length})`;
+            document.getElementById('ml-status').innerText = `AI 探索率: ${Math.round(this.explorationRate * 100)}% (純金記憶庫: ${this.memory.length})`;
         }
     }
 }
@@ -968,6 +1005,7 @@ carromBrain.init();
 
 function executeAIActionSync() {
     lastAIState = carromBrain.getStateArray();
+    // 擊球前，先偷偷問大師這局的完美答案是什麼
     lastAIExpertAction = carromBrain.getExpertAction(); 
     
     const rawAction = carromBrain.predict(lastAIState);
@@ -1017,7 +1055,7 @@ async function customGameLoop() {
 }
 customGameLoop();
 
-//🔥 === 折線圖資料與初始化 ===
+// === 折線圖資料與初始化 ===
 let globalGameCount = 0;
 let turnHistory = [];
 let gameLabels = [];
@@ -1026,7 +1064,6 @@ let turnChart = null;
 function initChart() {
     const ctx = document.getElementById('turnChart').getContext('2d');
     
-    // 設定 Chart.js 預設字體顏色為淺色以搭配深色背景
     Chart.defaults.color = '#bdc3c7';
     
     turnChart = new Chart(ctx, {
@@ -1056,7 +1093,7 @@ function initChart() {
                     display: true, 
                     title: { display: true, text: '總出桿數' }, 
                     beginAtZero: true,
-                    max: 160 // 設定上限 160，因為 150 是強制死局重置的極限
+                    max: 160 
                 }
             },
             plugins: {
@@ -1069,7 +1106,6 @@ function initChart() {
 function addChartData(turns) {
     globalGameCount++;
     
-    // 最多只保留最新 50 局的紀錄，讓圖表不會因為點太多而變成糊糊的一條線
     if (gameLabels.length >= 50) {
         gameLabels.shift();
         turnHistory.shift();
@@ -1078,11 +1114,9 @@ function addChartData(turns) {
     gameLabels.push(globalGameCount);
     turnHistory.push(turns);
     
-    // 為了效能，背景極速訓練時不更新畫面，等出關時再一口氣畫出來
     if (turnChart && !isBackgroundTraining) {
         turnChart.update();
     }
 }
 
-// 啟動時立刻初始化圖表
 initChart();
