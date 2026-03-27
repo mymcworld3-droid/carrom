@@ -25,21 +25,30 @@
         .black-icon { background-color: #2c3e50; border: 1px solid #95a5a6; }
         .white-icon { background-color: #ecf0f1; border: 1px solid #95a5a6; color: #2c3e50; }
         
-        /* 訓練控制面板 (掛機訓練與打包匯出用) */
-        #ml-controls { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; z-index: 100; flex-wrap: wrap; max-width: 800px; }
+        /* 訓練控制面板 */
+        #ml-controls { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; z-index: 100; flex-wrap: wrap; max-width: 900px; }
         #ml-controls button { padding: 10px 15px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         #btn-self-play { background-color: #e67e22; color: white; }
         #btn-self-play:active { background-color: #d35400; }
         #btn-download { background-color: #3498db; color: white; }
         #btn-download:active { background-color: #2980b9; }
-        
-        /*🔥 新增：重新訓練按鈕樣式 */
         #btn-reset-ai { background-color: #e74c3c; color: white; }
         #btn-reset-ai:active { background-color: #c0392b; }
+        
+        /*🔥 新增：背景極速訓練按鈕 */
+        #btn-bg-train { background-color: #9b59b6; color: white; }
+        #btn-bg-train:active { background-color: #8e44ad; }
         
         /* 速度調整拉桿樣式 */
         .speed-control { display: flex; align-items: center; gap: 10px; color: white; font-size: 14px; font-weight: bold; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 8px; }
         input[type=range] { cursor: pointer; }
+
+        /*🔥 新增：背景訓練遮罩畫面 */
+        #bg-training-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 62, 80, 0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #bg-training-screen h2 { font-size: 36px; color: #f1c40f; margin-bottom: 10px; }
+        #bg-progress-text { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #3498db; animation: spin 1s ease-in-out infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -63,13 +72,21 @@
     </div>
     
     <div id="ml-controls">
-        <button id="btn-self-play">🤖 啟動 AI 左右互搏</button>
+        <button id="btn-self-play">🤖 啟動畫面互搏</button>
         <div class="speed-control">
-            <span id="speed-label">訓練速度: 10x</span>
+            <span id="speed-label">畫面速度: 10x</span>
             <input type="range" id="speed-slider" min="1" max="20" value="10" step="1">
         </div>
+        <button id="btn-bg-train">⚡ 閉關極速訓練 500 局</button>
         <button id="btn-download">💾 匯出打包 AI 大腦</button>
-        <button id="btn-reset-ai">⚠️ 重新訓練 AI</button>
+        <button id="btn-reset-ai">⚠️ 刪除記憶</button>
+    </div>
+
+    <div id="bg-training-screen">
+        <div class="spinner"></div>
+        <h2>⚡ 精神時光屋：閉關極速訓練中...</h2>
+        <p id="bg-progress-text">已完成: 0 / 500 局</p>
+        <p style="color: #bdc3c7; font-size: 16px;">(此模式會關閉畫面渲染，讓神經網路在背景以最高效能狂飆)</p>
     </div>
     
     <script src="/socket.io/socket.io.js"></script> 
