@@ -160,6 +160,48 @@ class Leopard {
     }
 }
 
+// 🔥 新增預測碰撞的輔助函式
+function getPredictedCollision(attacker, dx, dy) {
+    const angle = Math.atan2(dy, dx);
+    const rayVx = Math.cos(angle);
+    const rayVy = Math.sin(angle);
+    
+    let closestDist = Infinity;
+    let target = null;
+
+    leopards.forEach(l => {
+        if (l === attacker || l.isDying) return;
+
+        const toTargetX = l.x - attacker.x;
+        const toTargetY = l.y - attacker.y;
+        const projection = toTargetX * rayVx + toTargetY * rayVy;
+        
+        if (projection > 0) {
+            const nearestX = attacker.x + rayVx * projection;
+            const nearestY = attacker.y + rayVy * projection;
+            const distSq = (l.x - nearestX)**2 + (l.y - nearestY)**2;
+
+            const collisionDistThreshold = attacker.radius + l.radius;
+            if (distSq < collisionDistThreshold**2) {
+                const offset = Math.sqrt(collisionDistThreshold**2 - distSq);
+                const actualDist = projection - offset;
+
+                if (actualDist > 0 && actualDist < closestDist) {
+                    closestDist = actualDist;
+                    target = l;
+                }
+            }
+        }
+    });
+
+    if (target) {
+        const ghostX = attacker.x + rayVx * closestDist;
+        const ghostY = attacker.y + rayVy * closestDist;
+        return { hit: true, ghostX, ghostY, target };
+    }
+    return { hit: false };
+}
+
 // 🔥 初始化外部計分圓圈
 function initScoreDots() {
     blueDotsContainer.innerHTML = '';
@@ -291,12 +333,12 @@ function resolveCollisions() {
     }
 }
 
-function drawArrow(context, fromx, fromy, tox, toy) {
+function drawArrow(context, fromx, fromy, tox, toy, color = 'yellow') {
     const headlen = 15; 
     const angle = Math.atan2(toy - fromy, tox - fromx);
     context.save();
-    context.strokeStyle = 'yellow';
-    context.lineWidth = 5;
+    context.strokeStyle = color;
+    context.lineWidth = 4;
     context.beginPath();
     context.moveTo(fromx, fromy);
     context.lineTo(tox, toy);
@@ -306,7 +348,7 @@ function drawArrow(context, fromx, fromy, tox, toy) {
     context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
     context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
     context.closePath();
-    context.fillStyle = 'yellow';
+    context.fillStyle = color;
     context.fill();
     context.restore();
 }
@@ -407,21 +449,67 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     if (isDragging && selectedLeopard) {
-        ctx.beginPath();
-        ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
-        ctx.lineTo(dragEndPos.x, dragEndPos.y);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        let arrowDx = selectedLeopard.x - dragEndPos.x;
-        let arrowDy = selectedLeopard.y - dragEndPos.y;
-        const arrowDist = Math.sqrt(arrowDx**2 + arrowDy**2);
-        if (arrowDist > MAX_DRAG) {
-            const ratio = MAX_DRAG / arrowDist;
-            arrowDx *= ratio; arrowDy *= ratio;
+        let dx = selectedLeopard.x - dragEndPos.x;
+        let dy = selectedLeopard.y - dragEndPos.y;
+        const dist = Math.sqrt(dx**2 + dy**2);
+        
+        if (dist > 5) {
+            const prediction = getPredictedCollision(selectedLeopard, dx, dy);
+            
+            if (prediction.hit) {
+                // 1. 繪製到碰撞點的虛線
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([8, 6]);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
+                ctx.lineTo(prediction.ghostX, prediction.ghostY);
+                ctx.stroke();
+                ctx.restore();
+
+                // 2. 繪製預測位置的圓圈虛影
+                ctx.save();
+                ctx.globalAlpha = 0.4;
+                ctx.beginPath();
+                ctx.arc(prediction.ghostX, prediction.ghostY, selectedLeopard.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'white';
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.fillStyle = selectedLeopard.color;
+                ctx.fill();
+                ctx.restore();
+
+                // 3. 繪製擊中後的路徑箭頭
+                const hitAngle = Math.atan2(prediction.target.y - prediction.ghostY, prediction.target.x - prediction.ghostX);
+                
+                // 被擊中的豹豹路徑 (紅色箭頭)
+                const victimTx = prediction.target.x + Math.cos(hitAngle) * 60;
+                const victimTy = prediction.target.y + Math.sin(hitAngle) * 60;
+                drawArrow(ctx, prediction.target.x, prediction.target.y, victimTx, victimTy, '#ff4444');
+
+                // 本身碰撞後的折射路徑 (黃色箭頭)
+                const moveAngle = Math.atan2(dy, dx);
+                const reflectAngle = hitAngle + (moveAngle > hitAngle ? -Math.PI/2 : Math.PI/2);
+                const attackerTx = prediction.ghostX + Math.cos(reflectAngle) * 50;
+                const attackerTy = prediction.ghostY + Math.sin(reflectAngle) * 50;
+                drawArrow(ctx, prediction.ghostX, prediction.ghostY, attackerTx, attackerTy, 'yellow');
+
+            } else {
+                // 未擊中目標時，顯示帶箭頭的發射虛線
+                ctx.save();
+                ctx.setLineDash([8, 6]);
+                let arrowDx = dx;
+                let arrowDy = dy;
+                const arrowDist = Math.sqrt(arrowDx**2 + arrowDy**2);
+                if (arrowDist > MAX_DRAG) {
+                    const ratio = MAX_DRAG / arrowDist;
+                    arrowDx *= ratio; arrowDy *= ratio;
+                }
+                drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + arrowDx, selectedLeopard.y + arrowDy, 'rgba(255, 255, 255, 0.5)');
+                ctx.restore();
+            }
         }
-        drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + arrowDx, selectedLeopard.y + arrowDy);
     }
 
     leopards.forEach(l => {
