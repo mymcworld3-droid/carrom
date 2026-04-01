@@ -7,7 +7,6 @@ const redCountEl = document.getElementById('red-count');
 canvas.width = 800;
 canvas.height = 600;
 
-// 遊戲常數
 const FRICTION = 0.985; 
 const WALL_BOUNCE = 0.8; 
 const MIN_SPEED = 0.2; 
@@ -157,7 +156,6 @@ function updateUI() {
     redCountEl.innerText = leopards.filter(l => l.team === 'red').length;
 }
 
-// 🔥 統一處理座標獲取 (滑鼠與觸控)
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
@@ -176,7 +174,6 @@ function getPointerPos(e) {
     };
 }
 
-// 🔥 監聽開始操作 (mousedown / touchstart)
 function handleStart(e) {
     if (isProcessing) return;
     const pos = getPointerPos(e);
@@ -192,19 +189,21 @@ function handleStart(e) {
         }
     });
     
-    if (isDragging) e.preventDefault(); // 防止平板捲動
+    // 🔥 關鍵：攔截事件，防止瀏覽器觸發雙擊或長按
+    if (isDragging) {
+        if (e.cancelable) e.preventDefault();
+    }
 }
 
-// 🔥 監聽移動中 (mousemove / touchmove)
 function handleMove(e) {
     if (!isDragging) return;
     const pos = getPointerPos(e);
     dragEndPos.x = pos.x;
     dragEndPos.y = pos.y;
-    e.preventDefault();
+    // 🔥 關鍵：防止拖動豹豹時網頁跟著跑
+    if (e.cancelable) e.preventDefault();
 }
 
-// 🔥 監聽放開 (mouseup / touchend)
 function handleEnd(e) {
     if (!isDragging) return;
 
@@ -220,11 +219,10 @@ function handleEnd(e) {
     isProcessing = true;
 }
 
-// 註冊事件
 canvas.addEventListener('mousedown', handleStart);
 canvas.addEventListener('touchstart', handleStart, { passive: false });
 
-window.addEventListener('mousemove', handleMove);
+window.addEventListener('mousemove', handleMove, { passive: false });
 window.addEventListener('touchmove', handleMove, { passive: false });
 
 window.addEventListener('mouseup', handleEnd);
