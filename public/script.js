@@ -19,7 +19,7 @@ let damageTexts = [];
 let particles = []; 
 let blueKills = 0;   
 let redKills = 0;    
-let currentActionDamage = 0; // 🔥 單次行動累計傷害
+let currentActionDamage = 0; 
 let currentTurn = 'blue'; 
 let isDragging = false;
 let selectedLeopard = null;
@@ -147,7 +147,6 @@ class Leopard {
 
     die() {
         this.isDying = true;
-        // 🔥 爆炸特效粒子
         for (let i = 0; i < 25; i++) {
             particles.push(new Particle(this.x, this.y, this.color));
         }
@@ -160,7 +159,7 @@ class Leopard {
     }
 }
 
-// 🔥 新增預測碰撞的輔助函式
+// 🔥 預測碰撞邏輯
 function getPredictedCollision(attacker, dx, dy) {
     const angle = Math.atan2(dy, dx);
     const rayVx = Math.cos(angle);
@@ -202,7 +201,6 @@ function getPredictedCollision(attacker, dx, dy) {
     return { hit: false };
 }
 
-// 🔥 初始化外部計分圓圈
 function initScoreDots() {
     blueDotsContainer.innerHTML = '';
     redDotsContainer.innerHTML = '';
@@ -220,7 +218,6 @@ function updateExternalUI() {
         rDots[i].classList.toggle('red-fill', i < redKills);
     }
 
-    // 🔥 更新單次傷害顯示
     if (currentActionDamage > 0) {
         actionDamageEl.innerText = `💥 行動傷害: ${Math.floor(currentActionDamage)}`;
         actionDamageEl.style.opacity = '1';
@@ -298,7 +295,6 @@ function resolveCollisions() {
                         let victim = (attacker === b1) ? b2 : b1;
                         
                         victim.hp -= attacker.atk;
-                        // 🔥 更新單次行動總傷害
                         currentActionDamage += attacker.atk;
                         updateExternalUI();
 
@@ -376,7 +372,6 @@ function checkTurnSystem() {
             }
         }
         
-        // 🔥 重置單次行動傷害顯示
         actionDamageEl.style.opacity = '0';
         currentActionDamage = 0;
 
@@ -454,10 +449,18 @@ function gameLoop() {
         const dist = Math.sqrt(dx**2 + dy**2);
         
         if (dist > 5) {
-            const prediction = getPredictedCollision(selectedLeopard, dx, dy);
+            // 限制最大力道
+            let limitedDx = dx;
+            let limitedDy = dy;
+            if (dist > MAX_DRAG) {
+                const ratio = MAX_DRAG / dist;
+                limitedDx *= ratio; limitedDy *= ratio;
+            }
+
+            const prediction = getPredictedCollision(selectedLeopard, limitedDx, limitedDy);
             
             if (prediction.hit) {
-                // 1. 繪製到碰撞點的虛線
+                // 1. 到碰撞點的虛線
                 ctx.save();
                 ctx.beginPath();
                 ctx.setLineDash([8, 6]);
@@ -468,7 +471,7 @@ function gameLoop() {
                 ctx.stroke();
                 ctx.restore();
 
-                // 2. 繪製預測位置的圓圈虛影
+                // 2. 圓圈虛影
                 ctx.save();
                 ctx.globalAlpha = 0.4;
                 ctx.beginPath();
@@ -480,33 +483,33 @@ function gameLoop() {
                 ctx.fill();
                 ctx.restore();
 
-                // 3. 繪製擊中後的路徑箭頭
-                const hitAngle = Math.atan2(prediction.target.y - prediction.ghostY, prediction.target.x - prediction.ghostX);
+                // 3. 物理動量分配預測 (紅色與黃色箭頭長度隨力道改變)
+                const vLaunchX = limitedDx * LAUNCH_FORCE_MULT;
+                const vLaunchY = limitedDy * LAUNCH_FORCE_MULT;
                 
-                // 被擊中的豹豹路徑 (紅色箭頭)
-                const victimTx = prediction.target.x + Math.cos(hitAngle) * 60;
-                const victimTy = prediction.target.y + Math.sin(hitAngle) * 60;
-                drawArrow(ctx, prediction.target.x, prediction.target.y, victimTx, victimTy, '#ff4444');
+                // 法線向量 (Ghost -> Target)
+                const nx = (prediction.target.x - prediction.ghostX) / (selectedLeopard.radius + prediction.target.radius);
+                const ny = (prediction.target.y - prediction.ghostY) / (selectedLeopard.radius + prediction.target.radius);
+                
+                // 投影 (傳遞給目標的衝量)
+                const dot = vLaunchX * nx + vLaunchY * ny;
+                
+                // 被擊中者向量 (紅色箭頭)
+                const vVictimX = dot * nx;
+                const vVictimY = dot * ny;
+                
+                // 本身碰撞後向量 (黃色箭頭 = 原始向量 - 傳遞向量)
+                const vAttackerX = vLaunchX - vVictimX;
+                const vAttackerY = vLaunchY - vVictimY;
 
-                // 本身碰撞後的折射路徑 (黃色箭頭)
-                const moveAngle = Math.atan2(dy, dx);
-                const reflectAngle = hitAngle + (moveAngle > hitAngle ? -Math.PI/2 : Math.PI/2);
-                const attackerTx = prediction.ghostX + Math.cos(reflectAngle) * 50;
-                const attackerTy = prediction.ghostY + Math.sin(reflectAngle) * 50;
-                drawArrow(ctx, prediction.ghostX, prediction.ghostY, attackerTx, attackerTy, 'yellow');
+                const arrowScale = 6; // 視覺縮放係數
+                drawArrow(ctx, prediction.target.x, prediction.target.y, prediction.target.x + vVictimX * arrowScale, prediction.target.y + vVictimY * arrowScale, '#ff4444');
+                drawArrow(ctx, prediction.ghostX, prediction.ghostY, prediction.ghostX + vAttackerX * arrowScale, prediction.ghostY + vAttackerY * arrowScale, 'yellow');
 
             } else {
-                // 未擊中目標時，顯示帶箭頭的發射虛線
                 ctx.save();
                 ctx.setLineDash([8, 6]);
-                let arrowDx = dx;
-                let arrowDy = dy;
-                const arrowDist = Math.sqrt(arrowDx**2 + arrowDy**2);
-                if (arrowDist > MAX_DRAG) {
-                    const ratio = MAX_DRAG / arrowDist;
-                    arrowDx *= ratio; arrowDy *= ratio;
-                }
-                drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + arrowDx, selectedLeopard.y + arrowDy, 'rgba(255, 255, 255, 0.5)');
+                drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + limitedDx, selectedLeopard.y + limitedDy, 'rgba(255, 255, 255, 0.5)');
                 ctx.restore();
             }
         }
