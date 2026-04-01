@@ -1,13 +1,13 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const turnDisplay = document.getElementById('turn-display');
-const blueCountEl = document.getElementById('blue-count');
-const redCountEl = document.getElementById('red-count');
+const actionDamageEl = document.getElementById('action-damage-text');
+const blueDotsContainer = document.getElementById('blue-score-dots');
+const redDotsContainer = document.getElementById('red-score-dots');
 
 canvas.width = 800;
 canvas.height = 600;
 
-// 遊戲常數
 const FRICTION = 0.985; 
 const WALL_BOUNCE = 0.8; 
 const MIN_SPEED = 0.2; 
@@ -16,9 +16,10 @@ const MAX_DRAG = 150;
 
 let leopards = [];
 let damageTexts = []; 
-let particles = []; // 🔥 儲存死亡特效粒子
-let blueKills = 0;   // 藍隊擊殺數
-let redKills = 0;    // 紅隊擊殺數
+let particles = []; 
+let blueKills = 0;   
+let redKills = 0;    
+let currentActionDamage = 0; // 🔥 單次行動累計傷害
 let currentTurn = 'blue'; 
 let isDragging = false;
 let selectedLeopard = null;
@@ -26,29 +27,29 @@ let dragEndPos = { x: 0, y: 0 };
 let isProcessing = false; 
 let gameOver = false;
 
-// 🔥 重生點定義 (每個隊伍有三個固定點)
 const blueSpawns = [{x: 100, y: 150}, {x: 100, y: 300}, {x: 100, y: 450}];
 const redSpawns = [{x: 700, y: 150}, {x: 700, y: 300}, {x: 700, y: 450}];
 
-// 死亡粒子類別
 class Particle {
     constructor(x, y, color) {
         this.x = x;
         this.y = y;
         this.color = color;
-        this.vx = (Math.random() - 0.5) * 10;
-        this.vy = (Math.random() - 0.5) * 10;
-        this.life = 30 + Math.random() * 20;
-        this.size = Math.random() * 5 + 2;
+        this.vx = (Math.random() - 0.5) * 12;
+        this.vy = (Math.random() - 0.5) * 12;
+        this.life = 40 + Math.random() * 20;
+        this.size = Math.random() * 6 + 2;
     }
     update() {
         this.x += this.vx;
         this.y += this.vy;
+        this.vx *= 0.95;
+        this.vy *= 0.95;
         this.life--;
     }
     draw() {
         ctx.save();
-        ctx.globalAlpha = this.life / 50;
+        ctx.globalAlpha = this.life / 60;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -95,7 +96,7 @@ class Leopard {
         this.hp = 100;
         this.atk = 20;
         this.hasMoved = false; 
-        this.isDying = false; // 🔥 是否正在播放死亡動畫
+        this.isDying = false; 
     }
 
     draw() {
@@ -146,42 +147,41 @@ class Leopard {
 
     die() {
         this.isDying = true;
-        // 🔥 產生粒子爆炸
-        for (let i = 0; i < 20; i++) {
+        // 🔥 爆炸特效粒子
+        for (let i = 0; i < 25; i++) {
             particles.push(new Particle(this.x, this.y, this.color));
         }
-        // 增加對方擊殺數
+        
         if (this.team === 'blue') redKills++;
         else blueKills++;
         
+        updateExternalUI();
         checkWinCondition();
     }
 }
 
-// 🔥 繪製頂部擊殺進度圓圈
-function drawScoreUI() {
-    const radius = 10;
-    const spacing = 30;
-    const topY = 30;
-
-    // 藍隊進度 (左側)
+// 🔥 初始化外部計分圓圈
+function initScoreDots() {
+    blueDotsContainer.innerHTML = '';
+    redDotsContainer.innerHTML = '';
     for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        ctx.arc(50 + i * spacing, topY, radius, 0, Math.PI * 2);
-        ctx.fillStyle = i < blueKills ? '#3498db' : '#555';
-        ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.stroke();
+        const d1 = document.createElement('div'); d1.className = 'dot'; blueDotsContainer.appendChild(d1);
+        const d2 = document.createElement('div'); d2.className = 'dot'; redDotsContainer.appendChild(d2);
+    }
+}
+
+function updateExternalUI() {
+    const bDots = blueDotsContainer.children;
+    const rDots = redDotsContainer.children;
+    for (let i = 0; i < 5; i++) {
+        bDots[i].classList.toggle('blue-fill', i < blueKills);
+        rDots[i].classList.toggle('red-fill', i < redKills);
     }
 
-    // 紅隊進度 (右側)
-    for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        ctx.arc(canvas.width - 50 - i * spacing, topY, radius, 0, Math.PI * 2);
-        ctx.fillStyle = i < redKills ? '#e74c3c' : '#555';
-        ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.stroke();
+    // 🔥 更新單次傷害顯示
+    if (currentActionDamage > 0) {
+        actionDamageEl.innerText = `💥 行動傷害: ${Math.floor(currentActionDamage)}`;
+        actionDamageEl.style.opacity = '1';
     }
 }
 
@@ -190,10 +190,10 @@ function checkWinCondition() {
         gameOver = true;
         turnDisplay.innerText = blueKills >= 5 ? "藍隊獲勝！" : "紅隊獲勝！";
         turnDisplay.style.color = "gold";
+        turnDisplay.style.fontSize = "32px";
     }
 }
 
-// 🔥 重生邏輯：選一個離敵人最遠的點
 function respawnLeopard(leopard) {
     const points = leopard.team === 'blue' ? blueSpawns : redSpawns;
     const enemies = leopards.filter(l => l.team !== leopard.team && !l.isDying);
@@ -207,14 +207,12 @@ function respawnLeopard(leopard) {
             let d = Math.sqrt((p.x - e.x)**2 + (p.y - e.y)**2);
             if (d < minDistToEnemy) minDistToEnemy = d;
         });
-        
         if (minDistToEnemy > maxMinDist) {
             maxMinDist = minDistToEnemy;
             bestPoint = p;
         }
     });
 
-    // 重置豹豹狀態
     leopard.x = bestPoint.x;
     leopard.y = bestPoint.y;
     leopard.vx = 0;
@@ -225,6 +223,7 @@ function respawnLeopard(leopard) {
 }
 
 function initGame() {
+    initScoreDots();
     leopards = [
         new Leopard(150, 150, 25, '#3498db', 'blue', 1),
         new Leopard(240, 300, 25, '#3498db', 'blue', 2), 
@@ -257,12 +256,12 @@ function resolveCollisions() {
                         let victim = (attacker === b1) ? b2 : b1;
                         
                         victim.hp -= attacker.atk;
+                        // 🔥 更新單次行動總傷害
+                        currentActionDamage += attacker.atk;
+                        updateExternalUI();
+
                         damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk));
-                        
-                        // 🔥 檢查死亡
-                        if (victim.hp <= 0) {
-                            victim.die();
-                        }
+                        if (victim.hp <= 0) victim.die();
                     }
                 }
 
@@ -320,10 +319,7 @@ function checkTurnSystem() {
     if (isProcessing && activeLeopards.length === 0) {
         isProcessing = false;
         
-        // 🔥 重生已死亡的豹豹
-        leopards.forEach(l => {
-            if (l.isDying) respawnLeopard(l);
-        });
+        leopards.forEach(l => { if (l.isDying) respawnLeopard(l); });
 
         const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
         const nextTeamCanMove = leopards.some(l => l.team === nextTeam && !l.hasMoved);
@@ -337,6 +333,11 @@ function checkTurnSystem() {
                 currentTurn = 'blue';
             }
         }
+        
+        // 🔥 重置單次行動傷害顯示
+        actionDamageEl.style.opacity = '0';
+        currentActionDamage = 0;
+
         turnDisplay.innerText = `輪到${currentTurn === 'blue' ? '藍隊' : '紅隊'}彈射 1 隻`;
     }
 }
@@ -405,8 +406,6 @@ window.addEventListener('touchend', handleEnd);
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    drawScoreUI(); // 🔥 繪製計分 UI
-
     if (isDragging && selectedLeopard) {
         ctx.beginPath();
         ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
@@ -430,14 +429,12 @@ function gameLoop() {
         l.draw();
     });
 
-    // 更新粒子效果
     for (let i = particles.length - 1; i >= 0; i--) {
         particles[i].update();
         particles[i].draw();
         if (particles[i].life <= 0) particles.splice(i, 1);
     }
 
-    // 更新傷害文字
     for (let i = damageTexts.length - 1; i >= 0; i--) {
         damageTexts[i].update();
         damageTexts[i].draw();
