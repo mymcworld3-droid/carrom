@@ -4,8 +4,10 @@ body {
     background-color: #1a1a2e;
     font-family: "Microsoft JhengHei", sans-serif;
     display: flex;
-    flex-direction: column; /* 改為垂直排列以容納外部計分 */
-    justify-content: center;
+    flex-direction: column;
+    /* 🔥 從 center 改為 flex-start 並增加間距，讓配置往上調 */
+    justify-content: flex-start;
+    padding-top: 40px; 
     align-items: center;
     height: 100vh;
     overflow: hidden;
@@ -14,13 +16,13 @@ body {
     user-select: none;
 }
 
-/* 🔥 外部計分容器樣式 */
+/* 外部計分容器樣式 */
 #score-container {
     display: flex;
     align-items: center;
     justify-content: space-between;
     width: 800px;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
 }
 
 #game-title {
@@ -55,24 +57,17 @@ body {
     touch-action: none;
 }
 
-/* 🔥 單次行動傷害顯示 */
-#action-damage-container {
-    position: absolute;
-    top: -45px;
-    left: 0;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    pointer-events: none;
-}
-
+/* 🔥 行動傷害文字樣式：位於指令下方，具備發光與跳動感 */
 #action-damage-text {
+    display: block;
+    margin-top: 10px;
     color: #ffcc00;
-    font-size: 28px;
+    font-size: 36px;
     font-weight: bold;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    text-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8);
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: scale(0.8);
 }
 
 #ui-layer {
@@ -83,13 +78,24 @@ body {
     pointer-events: none;
     color: white;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    z-index: 10;
 }
 
 .stats {
-    padding: 10px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+#turn-display {
+    font-size: 20px;
+    margin-bottom: 5px;
+}
+
+#instruction {
+    font-size: 16px;
+    color: #aaa;
 }
 
 canvas {
