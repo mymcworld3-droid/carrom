@@ -49,7 +49,6 @@ class Particle {
         this.size = Math.random() * 8 + 2;
     }
     update() {
-        // 受時間縮放影響
         this.x += this.vx * timeScale;
         this.y += this.vy * timeScale;
         this.vx *= 0.96;
@@ -91,7 +90,6 @@ class DamageText {
         ctx.shadowBlur = 15;
         ctx.shadowColor = 'black';
         
-        // 模擬圖片中的跳動感
         const bounce = Math.sin(this.life * 0.1) * 5;
         ctx.fillStyle = 'white';
         ctx.fillText(this.value, this.x, this.y + bounce);
@@ -150,7 +148,6 @@ class Leopard {
     update() {
         if (this.isDying) return;
 
-        // 位移受 timeScale 影響
         this.x += this.vx * timeScale;
         this.y += this.vy * timeScale;
         this.vx *= FRICTION;
@@ -171,12 +168,10 @@ class Leopard {
 
     die() {
         this.isDying = true;
-        
-        // 🔥 觸發特寫效果
         isSlowMo = true;
-        slowMoTimer = 60; // 持續 60 幀的特寫
-        targetTimeScale = 0.1; // 極慢動作
-        camera.targetZoom = 2.5; // 放大
+        slowMoTimer = 60; 
+        targetTimeScale = 0.1; 
+        camera.targetZoom = 2.5; 
         camera.targetX = this.x;
         camera.targetY = this.y;
 
@@ -251,8 +246,13 @@ function updateExternalUI() {
     }
 
     if (currentActionDamage > 0) {
+        // 🔥 更新傷害文字並觸發縮放動畫
         actionDamageEl.innerText = `💥 行動總傷: ${Math.floor(currentActionDamage)}`;
         actionDamageEl.style.opacity = '1';
+        actionDamageEl.style.transform = 'scale(1.2)';
+        setTimeout(() => {
+            actionDamageEl.style.transform = 'scale(1.0)';
+        }, 150);
     }
 }
 
@@ -421,7 +421,6 @@ function getPointerPos(e) {
         clientX = e.clientX;
         clientY = e.clientY;
     }
-    // 🔥 修正攝影機縮放後的點擊座標偏移
     const x = (clientX - rect.left - canvas.width/2) / camera.zoom + camera.x;
     const y = (clientY - rect.top - canvas.height/2) / camera.zoom + camera.y;
     return { x, y };
@@ -433,7 +432,7 @@ function handleStart(e) {
     leopards.forEach(l => {
         if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
             let dist = Math.sqrt((pos.x - l.x)**2 + (pos.y - l.y)**2);
-            if (dist < l.radius * 1.5) { // 🔥 增大點擊判定，方便角落發射
+            if (dist < l.radius * 1.5) { 
                 selectedLeopard = l;
                 isDragging = true;
                 dragEndPos = { x: pos.x, y: pos.y };
@@ -476,7 +475,6 @@ window.addEventListener('mouseup', handleEnd);
 window.addEventListener('touchend', handleEnd);
 
 function updateCameraAndSlowMo() {
-    // 🔥 時間縮放平滑轉移
     timeScale += (targetTimeScale - timeScale) * 0.1;
     
     if (isSlowMo) {
@@ -490,7 +488,6 @@ function updateCameraAndSlowMo() {
         }
     }
 
-    // 🔥 攝影機平滑轉移 (Lerp)
     camera.zoom += (camera.targetZoom - camera.zoom) * 0.1;
     camera.x += (camera.targetX - camera.x) * 0.1;
     camera.y += (camera.targetY - camera.y) * 0.1;
@@ -501,7 +498,6 @@ function gameLoop() {
     
     updateCameraAndSlowMo();
 
-    // 🔴 套用攝影機變換
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(camera.zoom, camera.zoom);
@@ -586,7 +582,7 @@ function gameLoop() {
     resolveCollisions();
     checkTurnSystem();
 
-    ctx.restore(); // 🔴 結束攝影機變換
+    ctx.restore(); 
 
     requestAnimationFrame(gameLoop);
 }
