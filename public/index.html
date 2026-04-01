@@ -8,29 +8,44 @@
 </head>
 <body>
     <div id="menu-layer">
-        <h1>豹豹碰碰大作戰</h1>
-        <div class="menu-buttons">
-            <button onclick="startGame('single')">單人挑戰 (VS AI)</button>
-            <button onclick="startGame('local')">雙人對決 (同機)</button>
-            <button onclick="startGame('online')">連線大戰 (Socket.io)</button>
+        <div class="menu-content">
+            <h1 class="glow-title">豹豹碰碰大作戰</h1>
+            <p class="subtitle">LEOPARD BATTLE ARENA</p>
+            <div class="menu-buttons">
+                <button class="btn" onclick="startGame('single')">
+                    <span class="btn-icon">👤</span> 單人挑戰 (VS AI)
+                </button>
+                <button class="btn" onclick="startGame('local')">
+                    <span class="btn-icon">👥</span> 雙人對決 (同機)
+                </button>
+                <button class="btn online" onclick="startGame('online')">
+                    <span class="btn-icon">🌐</span> 連線大戰 (Socket.io)
+                </button>
+            </div>
+            <div class="footer-hint">建議使用行動裝置或滑鼠拖曳進行遊戲</div>
         </div>
-    </div>
-    <div id="score-container">
-        <div id="blue-score-dots" class="dots-group"></div>
-        <div id="game-title">豹豹碰碰大作戰</div>
-        <div id="red-score-dots" class="dots-group"></div>
     </div>
 
-    <div id="game-container">
-        <div id="ui-layer">
-            <div class="stats">
-                <span id="turn-display">目前回合：藍隊 (玩家)</span>
-                <span id="instruction">請拉動豹豹進行彈射</span>
-                <span id="action-damage-text"></span>
-            </div>
+    <div id="game-layer" style="display: none;">
+        <div id="score-container">
+            <div id="blue-score-dots" class="dots-group"></div>
+            <div id="game-title">豹豹大作戰</div>
+            <div id="red-score-dots" class="dots-group"></div>
         </div>
-        <canvas id="gameCanvas"></canvas>
+
+        <div id="game-container">
+            <div id="ui-layer">
+                <div class="stats">
+                    <span id="turn-display">目前回合：藍隊 (玩家)</span>
+                    <span id="instruction">請拉動豹豹進行彈射</span>
+                    <span id="action-damage-text"></span>
+                </div>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+        </div>
     </div>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
