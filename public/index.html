@@ -1,12 +1,36 @@
-<div id="menu-layer">
-    <h1>豹豹碰碰大作戰</h1>
-    <div class="menu-buttons">
-        <button onclick="startGame('single')">單人挑戰 (VS AI)</button>
-        <button onclick="startGame('local')">雙人對決 (同機)</button>
-        <button onclick="startGame('online')">連線大戰 (Socket.io)</button>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>豹豹碰碰大作戰</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="menu-layer">
+        <h1>豹豹碰碰大作戰</h1>
+        <div class="menu-buttons">
+            <button onclick="startGame('single')">單人挑戰 (VS AI)</button>
+            <button onclick="startGame('local')">雙人對決 (同機)</button>
+            <button onclick="startGame('online')">連線大戰 (Socket.io)</button>
+        </div>
     </div>
-</div>
+    <div id="score-container">
+        <div id="blue-score-dots" class="dots-group"></div>
+        <div id="game-title">豹豹碰碰大作戰</div>
+        <div id="red-score-dots" class="dots-group"></div>
+    </div>
 
-<div id="game-ui" style="display: none;"> <div id="score-container">...</div>
-    <div id="game-container">...</div>
-</div>
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="stats">
+                <span id="turn-display">目前回合：藍隊 (玩家)</span>
+                <span id="instruction">請拉動豹豹進行彈射</span>
+                <span id="action-damage-text"></span>
+            </div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
