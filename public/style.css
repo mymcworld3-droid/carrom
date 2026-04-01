@@ -4,23 +4,75 @@ body {
     background-color: #1a1a2e;
     font-family: "Microsoft JhengHei", sans-serif;
     display: flex;
+    flex-direction: column; /* 改為垂直排列以容納外部計分 */
     justify-content: center;
     align-items: center;
     height: 100vh;
     overflow: hidden;
-    /* 🔥 防止整個頁面被拉動或縮放 */
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
 }
+
+/* 🔥 外部計分容器樣式 */
+#score-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 800px;
+    margin-bottom: 10px;
+}
+
+#game-title {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
+}
+
+.dots-group {
+    display: flex;
+    gap: 8px;
+}
+
+.dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #444;
+    border: 2px solid white;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.dot.blue-fill { background-color: #3498db; box-shadow: 0 0 8px #3498db; }
+.dot.red-fill { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
 
 #game-container {
     position: relative;
     border: 4px solid #4ecca3;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
-    /* 🔥 確保容器也不會觸發手勢 */
     touch-action: none;
+}
+
+/* 🔥 單次行動傷害顯示 */
+#action-damage-container {
+    position: absolute;
+    top: -45px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+#action-damage-text {
+    color: #ffcc00;
+    font-size: 28px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    opacity: 0;
+    transition: opacity 0.2s;
 }
 
 #ui-layer {
@@ -40,26 +92,9 @@ body {
     align-items: center;
 }
 
-#score-board {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 20px;
-}
-
-.team {
-    padding: 5px 15px;
-    border-radius: 20px;
-    background: rgba(0,0,0,0.5);
-}
-
-.blue { color: #3498db; border: 1px solid #3498db; }
-.red { color: #e74c3c; border: 1px solid #e74c3c; }
-
 canvas {
     background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
     display: block;
-    /* 🔥 核心：禁止畫布上的所有瀏覽器預設手勢 */
     touch-action: none; 
-    /* 去除平板點擊時出現的藍色框 */
     -webkit-tap-highlight-color: transparent;
 }
