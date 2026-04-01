@@ -13,11 +13,38 @@ const MIN_SPEED = 0.2;
 const LAUNCH_FORCE_MULT = 0.15; 
 
 let leopards = [];
+let damageTexts = []; // 🔥 儲存顯示中的傷害數字
 let currentTurn = 'blue'; 
 let isDragging = false;
 let selectedLeopard = null;
 let dragEndPos = { x: 0, y: 0 };
 let isProcessing = false; 
+
+// 🔥 傷害數字類別
+class DamageText {
+    constructor(x, y, value) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+        this.life = 60; // 顯示約 1 秒
+        this.vy = -2;   // 往上飄
+        this.opacity = 1;
+    }
+    update() {
+        this.y += this.vy;
+        this.life--;
+        this.opacity = this.life / 60;
+    }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.opacity;
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`-${Math.floor(this.value)}`, this.x, this.y);
+        ctx.restore();
+    }
+}
 
 class Leopard {
     constructor(x, y, radius, color, team, id) {
@@ -40,7 +67,6 @@ class Leopard {
         ctx.fillStyle = this.color;
         ctx.fill();
         
-        // 🔥 外框視覺：如果本輪已動過，變灰色；若輪到它，給予黃色發光
         if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
             ctx.strokeStyle = 'yellow';
             ctx.lineWidth = 4;
@@ -52,11 +78,11 @@ class Leopard {
         }
         ctx.closePath();
 
-        // 血條
-        ctx.fillStyle = 'red';
-        ctx.fillRect(this.x - 20, this.y - this.radius - 10, 40, 5);
-        ctx.fillStyle = 'green';
-        ctx.fillRect(this.x - 20, this.y - this.radius - 10, (this.hp / 100) * 40, 5);
+        // 🔥 改到豹豹下面顯示 🗡️ 攻擊力與 ❤️ 生命值
+        ctx.fillStyle = 'white';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`❤️${Math.ceil(this.hp)}  🗡️${this.atk}`, this.x, this.y + this.radius + 20);
     }
 
     update() {
@@ -80,12 +106,14 @@ class Leopard {
 }
 
 function initGame() {
+    // 🔥 調整陣型：中間的豹豹往場中央推進
     leopards = [
         new Leopard(150, 200, 25, '#3498db', 'blue', 1),
-        new Leopard(150, 300, 25, '#3498db', 'blue', 2),
+        new Leopard(220, 300, 25, '#3498db', 'blue', 2), // 藍隊往前 (x變大)
         new Leopard(150, 400, 25, '#3498db', 'blue', 3),
+        
         new Leopard(650, 200, 25, '#e74c3c', 'red', 4),
-        new Leopard(650, 300, 25, '#e74c3c', 'red', 5),
+        new Leopard(580, 300, 25, '#e74c3c', 'red', 5),  // 紅隊往前 (x變小)
         new Leopard(650, 400, 25, '#e74c3c', 'red', 6)
     ];
 }
@@ -100,9 +128,16 @@ function resolveCollisions() {
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < b1.radius + b2.radius) {
+                // 🔥 碰撞傷害邏輯：只有敵對且速度夠快時產生傷害數字
                 if (b1.team !== b2.team) {
-                    b1.hp -= 0.5;
-                    b2.hp -= 0.5;
+                    let impact = Math.abs(b1.vx - b2.vx) + Math.abs(b1.vy - b2.vy);
+                    if (impact > 1) {
+                        let damage = 5; // 基礎傷害
+                        b1.hp -= damage;
+                        b2.hp -= damage;
+                        damageTexts.push(new DamageText(b1.x, b1.y - 20, damage));
+                        damageTexts.push(new DamageText(b2.x, b2.y - 20, damage));
+                    }
                 }
 
                 let collisionAngle = Math.atan2(dy, dx);
@@ -131,7 +166,27 @@ function resolveCollisions() {
     }
 }
 
-// 🔥 核心修改：輪流彈射邏輯
+// 🔥 新增：繪製箭頭函式
+function drawArrow(context, fromx, fromy, tox, toy) {
+    const headlen = 15; // 箭頭頭部長度
+    const angle = Math.atan2(toy - fromy, tox - fromx);
+    
+    context.beginPath();
+    context.moveTo(fromx, fromy);
+    context.lineTo(tox, toy);
+    context.strokeStyle = 'yellow';
+    context.lineWidth = 4;
+    context.stroke();
+    
+    context.beginPath();
+    context.moveTo(tox, toy);
+    context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+    context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+    context.closePath();
+    context.fillStyle = 'yellow';
+    context.fill();
+}
+
 function checkTurnSystem() {
     const activeLeopards = leopards.filter(l => Math.abs(l.vx) > 0 || Math.abs(l.vy) > 0);
     
@@ -140,24 +195,18 @@ function checkTurnSystem() {
         leopards = leopards.filter(l => l.hp > 0);
         updateUI();
 
-        // 1. 先確認對方是否還有可動的豹豹
         const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
         const nextTeamCanMove = leopards.some(l => l.team === nextTeam && !l.hasMoved);
 
         if (nextTeamCanMove) {
-            // 正常切換到對方
             currentTurn = nextTeam;
         } else {
-            // 如果對方沒得動了，檢查自己隊伍是否還有人能動
             const currentTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
             if (!currentTeamCanMove) {
-                // 如果兩邊都沒得動了，進入下一輪大回合，重置所有人
                 leopards.forEach(l => l.hasMoved = false);
-                currentTurn = 'blue'; // 或者保留勝者先手邏輯
+                currentTurn = 'blue';
             }
-            // 如果自己還能動但對方不能動，currentTurn 就不變，繼續讓當前隊伍動
         }
-        
         turnDisplay.innerText = `輪到${currentTurn === 'blue' ? '藍隊' : '紅隊'}彈射 1 隻`;
     }
 }
@@ -226,26 +275,35 @@ window.addEventListener('touchend', handleEnd);
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 繪製拉弓輔助線
     if (isDragging && selectedLeopard) {
         ctx.beginPath();
         ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
         ctx.lineTo(dragEndPos.x, dragEndPos.y);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.setLineDash([5, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
+        
+        // 🔥 黃色直線改為箭頭
         const dx = selectedLeopard.x - dragEndPos.x;
         const dy = selectedLeopard.y - dragEndPos.y;
-        ctx.beginPath();
-        ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
-        ctx.lineTo(selectedLeopard.x + dx, selectedLeopard.y + dy);
-        ctx.strokeStyle = 'yellow';
-        ctx.stroke();
+        drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + dx, selectedLeopard.y + dy);
     }
+
     leopards.forEach(l => {
         l.update();
         l.draw();
     });
+
+    // 🔥 更新並繪製傷害數字
+    for (let i = damageTexts.length - 1; i >= 0; i--) {
+        damageTexts[i].update();
+        damageTexts[i].draw();
+        if (damageTexts[i].life <= 0) damageTexts.splice(i, 1);
+    }
+
     resolveCollisions();
     checkTurnSystem();
     requestAnimationFrame(gameLoop);
