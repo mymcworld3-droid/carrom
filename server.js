@@ -17,16 +17,22 @@ const io = new Server(server, {
 // 指定靜態檔案目錄（存放 index.html, style.css, script.js 的地方）
 app.use(express.static(path.join(__dirname, 'public')));
 
+    // 🔥 更新 Socket.io 邏輯
 io.on('connection', (socket) => {
-    console.log('玩家已連線:', socket.id);
+    console.log('玩家連線:', socket.id);
 
-    // 你可以在這裡加入豹豹碰碰大作戰需要的通訊邏輯，例如：
-    // socket.on('updatePosition', (data) => {
-    //     socket.broadcast.emit('opponentPosition', data);
-    // });
+    // 簡單的分隊邏輯：第一個進來藍隊，第二個紅隊
+    const playerCount = io.engine.clientsCount;
+    const team = playerCount % 2 === 1 ? 'blue' : 'red';
+    socket.emit('initTeam', team);
+
+    socket.on('playerMove', (data) => {
+        // 將操作廣播給對手
+        socket.broadcast.emit('opponentMove', data);
+    });
 
     socket.on('disconnect', () => {
-        console.log('玩家已斷線:', socket.id);
+        console.log('玩家斷線');
     });
 });
 
