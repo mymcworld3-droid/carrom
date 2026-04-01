@@ -1,107 +1,24 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>克朗棋 (ML 神經網路訓練版)</title>
-    <style>
-        body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; display: flex; justify-content: center; align-items: center; height: 100vh; color: #ecf0f1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
-        canvas { box-shadow: 0 15px 30px rgba(0,0,0,0.6); border-radius: 8px; }
-        #ui { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 12px; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
-        #ui h3 { margin: 0 0 10px 0; color: #f1c40f; }
-        #ui p { margin: 5px 0; font-size: 14px; color: #bdc3c7; }
-        
-        #turn-indicator { font-size: 18px; font-weight: bold; margin-bottom: 15px !important; color: #2ecc71; }
-        
-        /* ML 訓練狀態顯示器 */
-        #ml-status { font-size: 12px; color: #3498db; margin-top: 10px; }
-
-        /* 右側計分板樣式 */
-        #scoreboard { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
-        .score-item { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: bold; }
-        .piece-icon { width: 24px; height: 24px; border-radius: 50%; position: relative; }
-        .piece-icon::after { content: ''; position: absolute; top: 3px; left: 3px; right: 3px; bottom: 3px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); }
-        .piece-icon::before { content: ''; position: absolute; top: 3px; left: 3px; width: 8px; height: 8px; border-radius: 50%; border-top: 2px solid rgba(255,255,255,0.4); border-left: 2px solid rgba(255,255,255,0.4); transform: rotate(-15deg); }
-        .black-icon { background-color: #2c3e50; border: 1px solid #95a5a6; }
-        .white-icon { background-color: #ecf0f1; border: 1px solid #95a5a6; color: #2c3e50; }
-        
-        /* 訓練控制面板 */
-        #ml-controls { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; z-index: 100; flex-wrap: wrap; max-width: 900px; }
-        #ml-controls button { padding: 10px 15px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        #btn-self-play { background-color: #e67e22; color: white; }
-        #btn-self-play:active { background-color: #d35400; }
-        #btn-download { background-color: #3498db; color: white; }
-        #btn-download:active { background-color: #2980b9; }
-        #btn-reset-ai { background-color: #e74c3c; color: white; }
-        #btn-reset-ai:active { background-color: #c0392b; }
-        #btn-bg-train { background-color: #9b59b6; color: white; }
-        #btn-bg-train:active { background-color: #8e44ad; }
-        
-        /* 速度調整拉桿樣式 */
-        .speed-control { display: flex; align-items: center; gap: 10px; color: white; font-size: 14px; font-weight: bold; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 8px; }
-        input[type=range] { cursor: pointer; }
-
-        /*🔥 新增：折線圖容器樣式 (放在右下角) */
-        #chart-container { position: absolute; bottom: 20px; right: 20px; width: 350px; height: 220px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); z-index: 50; }
-
-        /* 背景訓練遮罩畫面 */
-        #bg-training-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 62, 80, 0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #bg-training-screen h2 { font-size: 36px; color: #f1c40f; margin-bottom: 10px; }
-        #bg-progress-text { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
-        .spinner { width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #3498db; animation: spin 1s ease-in-out infinite; margin-bottom: 20px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
+    <title>豹豹碰碰大作戰</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="ui">
-        <h3>克朗棋 (ML 神經網路訓練版)</h3>
-        <p id="turn-indicator">現在輪到：玩家 1 (下方，黑棋)</p>
-        <p>拖曳擊打紅色打擊子 (Striker)</p>
-        <p>點擊底線空白處可平移紅球</p>
-        <div id="ml-status">AI 探索率: 100% (完全隨機)</div>
-    </div>
-
-    <div id="scoreboard">
-        <div class="score-item">
-            <div class="piece-icon black-icon"></div>
-            <span id="black-count">x 9</span>
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="stats">
+                <span id="turn-display">目前回合：藍隊 (玩家)</span>
+                <span id="instruction">請點擊並拖動你的豹豹進行彈射</span>
+            </div>
+            <div id="score-board">
+                <div class="team blue">藍隊剩餘: <span id="blue-count">3</span></div>
+                <div class="team red">紅隊剩餘: <span id="red-count">3</span></div>
+            </div>
         </div>
-        <div class="score-item">
-            <div class="piece-icon white-icon"></div>
-            <span id="white-count">x 9</span>
-        </div>
+        <canvas id="gameCanvas"></canvas>
     </div>
-    
-    <div id="ml-controls">
-        <button id="btn-self-play">🤖 啟動畫面互搏</button>
-        <div class="speed-control">
-            <span id="speed-label">畫面速度: 10x</span>
-            <input type="range" id="speed-slider" min="1" max="20" value="10" step="1">
-        </div>
-        <div class="speed-control">
-            <span id="bg-target-label">目標局數:</span>
-            <input type="number" id="bg-target-input" value="50" min="1" max="5000" style="width: 60px; text-align: center; border-radius: 4px; border: none; padding: 2px;">
-        </div>
-        <button id="btn-bg-train">⚡ 啟動閉關極速訓練</button>
-        <button id="btn-download">💾 匯出打包 AI 大腦</button>
-        <button id="btn-reset-ai">⚠️ 刪除記憶</button>
-    </div>
-
-    <div id="chart-container">
-        <canvas id="turnChart"></canvas>
-    </div>
-
-    <div id="bg-training-screen">
-        <div class="spinner"></div>
-        <h2>⚡ 精神時光屋：閉關極速訓練中...</h2>
-        <p id="bg-progress-text">已完成: 0 / 500 局</p>
-        <p style="color: #bdc3c7; font-size: 16px;">(此模式會關閉畫面渲染，讓神經網路在背景以最高效能狂飆)</p>
-    </div>
-    
-    <script src="/socket.io/socket.io.js"></script> 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="game.js"></script>    
+    <script src="script.js"></script>
 </body>
 </html>
