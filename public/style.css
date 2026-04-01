@@ -5,9 +5,9 @@ body {
     font-family: "Microsoft JhengHei", sans-serif;
     display: flex;
     flex-direction: column;
-    /* 🔥 從 center 改為 flex-start 並增加間距，讓配置往上調 */
+    /* 🔥 將介面對齊最上方並大幅縮小頂部間距 */
     justify-content: flex-start;
-    padding-top: 40px; 
+    padding-top: 10px; 
     align-items: center;
     height: 100vh;
     overflow: hidden;
@@ -22,7 +22,8 @@ body {
     align-items: center;
     justify-content: space-between;
     width: 800px;
-    margin-bottom: 20px;
+    /* 🔥 縮小計分板與遊戲框之間的距離 */
+    margin-bottom: 5px;
 }
 
 #game-title {
@@ -57,10 +58,10 @@ body {
     touch-action: none;
 }
 
-/* 🔥 行動傷害文字樣式：位於指令下方，具備發光與跳動感 */
+/* 行動傷害文字樣式：位於指令下方 */
 #action-damage-text {
     display: block;
-    margin-top: 10px;
+    margin-top: 5px;
     color: #ffcc00;
     font-size: 36px;
     font-weight: bold;
@@ -82,7 +83,7 @@ body {
 }
 
 .stats {
-    padding: 15px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -90,7 +91,7 @@ body {
 
 #turn-display {
     font-size: 20px;
-    margin-bottom: 5px;
+    margin-bottom: 2px;
 }
 
 #instruction {
