@@ -8,6 +8,10 @@ body {
     align-items: center;
     height: 100vh;
     overflow: hidden;
+    /* 🔥 防止整個頁面被拉動或縮放 */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 #game-container {
@@ -15,6 +19,8 @@ body {
     border: 4px solid #4ecca3;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
+    /* 🔥 確保容器也不會觸發手勢 */
+    touch-action: none;
 }
 
 #ui-layer {
@@ -52,4 +58,8 @@ body {
 canvas {
     background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
     display: block;
+    /* 🔥 核心：禁止畫布上的所有瀏覽器預設手勢 */
+    touch-action: none; 
+    /* 去除平板點擊時出現的藍色框 */
+    -webkit-tap-highlight-color: transparent;
 }
