@@ -12,17 +12,51 @@ const FRICTION = 0.985;
 const WALL_BOUNCE = 0.8; 
 const MIN_SPEED = 0.2; 
 const LAUNCH_FORCE_MULT = 0.15; 
-const MAX_DRAG = 150; // 🔥 限制力道上限（像素距離）
+const MAX_DRAG = 150; 
 
 let leopards = [];
 let damageTexts = []; 
+let particles = []; // 🔥 儲存死亡特效粒子
+let blueKills = 0;   // 藍隊擊殺數
+let redKills = 0;    // 紅隊擊殺數
 let currentTurn = 'blue'; 
 let isDragging = false;
 let selectedLeopard = null;
 let dragEndPos = { x: 0, y: 0 };
 let isProcessing = false; 
+let gameOver = false;
 
-// 傷害數字跳出效果
+// 🔥 重生點定義 (每個隊伍有三個固定點)
+const blueSpawns = [{x: 100, y: 150}, {x: 100, y: 300}, {x: 100, y: 450}];
+const redSpawns = [{x: 700, y: 150}, {x: 700, y: 300}, {x: 700, y: 450}];
+
+// 死亡粒子類別
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.life = 30 + Math.random() * 20;
+        this.size = Math.random() * 5 + 2;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life--;
+    }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.life / 50;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 class DamageText {
     constructor(x, y, value) {
         this.x = x;
@@ -43,9 +77,7 @@ class DamageText {
         ctx.fillStyle = '#ffcc00'; 
         ctx.font = 'bold 28px Arial';
         ctx.textAlign = 'center';
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 4;
-        ctx.fillText(`-${this.value}`, this.x, this.y);
+        ctx.fillText(`-${Math.floor(this.value)}`, this.x, this.y);
         ctx.restore();
     }
 }
@@ -63,9 +95,12 @@ class Leopard {
         this.hp = 100;
         this.atk = 20;
         this.hasMoved = false; 
+        this.isDying = false; // 🔥 是否正在播放死亡動畫
     }
 
     draw() {
+        if (this.isDying) return; 
+
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
@@ -89,6 +124,8 @@ class Leopard {
     }
 
     update() {
+        if (this.isDying) return;
+
         this.x += this.vx;
         this.y += this.vy;
         this.vx *= FRICTION;
@@ -106,16 +143,92 @@ class Leopard {
             this.y = this.y - this.radius < 0 ? this.radius : canvas.height - this.radius;
         }
     }
+
+    die() {
+        this.isDying = true;
+        // 🔥 產生粒子爆炸
+        for (let i = 0; i < 20; i++) {
+            particles.push(new Particle(this.x, this.y, this.color));
+        }
+        // 增加對方擊殺數
+        if (this.team === 'blue') redKills++;
+        else blueKills++;
+        
+        checkWinCondition();
+    }
+}
+
+// 🔥 繪製頂部擊殺進度圓圈
+function drawScoreUI() {
+    const radius = 10;
+    const spacing = 30;
+    const topY = 30;
+
+    // 藍隊進度 (左側)
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.arc(50 + i * spacing, topY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = i < blueKills ? '#3498db' : '#555';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.stroke();
+    }
+
+    // 紅隊進度 (右側)
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.arc(canvas.width - 50 - i * spacing, topY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = i < redKills ? '#e74c3c' : '#555';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.stroke();
+    }
+}
+
+function checkWinCondition() {
+    if (blueKills >= 5 || redKills >= 5) {
+        gameOver = true;
+        turnDisplay.innerText = blueKills >= 5 ? "藍隊獲勝！" : "紅隊獲勝！";
+        turnDisplay.style.color = "gold";
+    }
+}
+
+// 🔥 重生邏輯：選一個離敵人最遠的點
+function respawnLeopard(leopard) {
+    const points = leopard.team === 'blue' ? blueSpawns : redSpawns;
+    const enemies = leopards.filter(l => l.team !== leopard.team && !l.isDying);
+    
+    let bestPoint = points[0];
+    let maxMinDist = -1;
+
+    points.forEach(p => {
+        let minDistToEnemy = Infinity;
+        enemies.forEach(e => {
+            let d = Math.sqrt((p.x - e.x)**2 + (p.y - e.y)**2);
+            if (d < minDistToEnemy) minDistToEnemy = d;
+        });
+        
+        if (minDistToEnemy > maxMinDist) {
+            maxMinDist = minDistToEnemy;
+            bestPoint = p;
+        }
+    });
+
+    // 重置豹豹狀態
+    leopard.x = bestPoint.x;
+    leopard.y = bestPoint.y;
+    leopard.vx = 0;
+    leopard.vy = 0;
+    leopard.hp = 100;
+    leopard.isDying = false;
+    leopard.hasMoved = false;
 }
 
 function initGame() {
     leopards = [
-        // 藍隊 (上下兩隻位於 150px 和 450px，約 1/4 與 3/4)
         new Leopard(150, 150, 25, '#3498db', 'blue', 1),
         new Leopard(240, 300, 25, '#3498db', 'blue', 2), 
         new Leopard(150, 450, 25, '#3498db', 'blue', 3),
-        
-        // 紅隊
         new Leopard(650, 150, 25, '#e74c3c', 'red', 4),
         new Leopard(560, 300, 25, '#e74c3c', 'red', 5), 
         new Leopard(650, 450, 25, '#e74c3c', 'red', 6)
@@ -127,6 +240,8 @@ function resolveCollisions() {
         for (let j = i + 1; j < leopards.length; j++) {
             let b1 = leopards[i];
             let b2 = leopards[j];
+            if (b1.isDying || b2.isDying) continue;
+
             let dx = b2.x - b1.x;
             let dy = b2.y - b1.y;
             let distance = Math.sqrt(dx * dx + dy * dy);
@@ -138,17 +253,16 @@ function resolveCollisions() {
                     let dotProduct = relVx * dx + relVy * dy;
 
                     if (dotProduct > 0) {
-                        let attacker, victim;
-                        if (b1.team === currentTurn) {
-                            attacker = b1;
-                            victim = b2;
-                        } else {
-                            attacker = b2;
-                            victim = b1;
-                        }
+                        let attacker = (b1.team === currentTurn) ? b1 : b2;
+                        let victim = (attacker === b1) ? b2 : b1;
                         
                         victim.hp -= attacker.atk;
                         damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk));
+                        
+                        // 🔥 檢查死亡
+                        if (victim.hp <= 0) {
+                            victim.die();
+                        }
                     }
                 }
 
@@ -181,7 +295,6 @@ function resolveCollisions() {
 function drawArrow(context, fromx, fromy, tox, toy) {
     const headlen = 15; 
     const angle = Math.atan2(toy - fromy, tox - fromx);
-    
     context.save();
     context.strokeStyle = 'yellow';
     context.lineWidth = 5;
@@ -189,7 +302,6 @@ function drawArrow(context, fromx, fromy, tox, toy) {
     context.moveTo(fromx, fromy);
     context.lineTo(tox, toy);
     context.stroke();
-    
     context.beginPath();
     context.moveTo(tox, toy);
     context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
@@ -201,12 +313,17 @@ function drawArrow(context, fromx, fromy, tox, toy) {
 }
 
 function checkTurnSystem() {
-    const activeLeopards = leopards.filter(l => Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05);
+    if (gameOver) return;
+
+    const activeLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
     if (isProcessing && activeLeopards.length === 0) {
         isProcessing = false;
-        leopards = leopards.filter(l => l.hp > 0);
-        updateUI();
+        
+        // 🔥 重生已死亡的豹豹
+        leopards.forEach(l => {
+            if (l.isDying) respawnLeopard(l);
+        });
 
         const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
         const nextTeamCanMove = leopards.some(l => l.team === nextTeam && !l.hasMoved);
@@ -224,11 +341,6 @@ function checkTurnSystem() {
     }
 }
 
-function updateUI() {
-    blueCountEl.innerText = leopards.filter(l => l.team === 'blue').length;
-    redCountEl.innerText = leopards.filter(l => l.team === 'red').length;
-}
-
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
@@ -243,12 +355,11 @@ function getPointerPos(e) {
 }
 
 function handleStart(e) {
-    if (isProcessing) return;
+    if (isProcessing || gameOver) return;
     const pos = getPointerPos(e);
-
     leopards.forEach(l => {
-        if (l.team === currentTurn && !l.hasMoved) {
-            let dist = Math.sqrt((pos.x - l.x) ** 2 + (pos.y - l.y) ** 2);
+        if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
+            let dist = Math.sqrt((pos.x - l.x)**2 + (pos.y - l.y)**2);
             if (dist < l.radius) {
                 selectedLeopard = l;
                 isDragging = true;
@@ -269,22 +380,16 @@ function handleMove(e) {
 
 function handleEnd(e) {
     if (!isDragging) return;
-    
-    // 🔥 限制力道上限的向量計算
     let dx = selectedLeopard.x - dragEndPos.x;
     let dy = selectedLeopard.y - dragEndPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
     if (dist > MAX_DRAG) {
         const ratio = MAX_DRAG / dist;
-        dx *= ratio;
-        dy *= ratio;
+        dx *= ratio; dy *= ratio;
     }
-
     selectedLeopard.vx = dx * LAUNCH_FORCE_MULT;
     selectedLeopard.vy = dy * LAUNCH_FORCE_MULT;
     selectedLeopard.hasMoved = true;
-    
     isDragging = false;
     selectedLeopard = null;
     isProcessing = true;
@@ -300,6 +405,8 @@ window.addEventListener('touchend', handleEnd);
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    drawScoreUI(); // 🔥 繪製計分 UI
+
     if (isDragging && selectedLeopard) {
         ctx.beginPath();
         ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
@@ -308,18 +415,13 @@ function gameLoop() {
         ctx.setLineDash([5, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
-        
-        // 🔥 繪製限制長度後的指向箭頭
         let arrowDx = selectedLeopard.x - dragEndPos.x;
         let arrowDy = selectedLeopard.y - dragEndPos.y;
-        const arrowDist = Math.sqrt(arrowDx * arrowDx + arrowDy * arrowDy);
-        
+        const arrowDist = Math.sqrt(arrowDx**2 + arrowDy**2);
         if (arrowDist > MAX_DRAG) {
             const ratio = MAX_DRAG / arrowDist;
-            arrowDx *= ratio;
-            arrowDy *= ratio;
+            arrowDx *= ratio; arrowDy *= ratio;
         }
-        
         drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + arrowDx, selectedLeopard.y + arrowDy);
     }
 
@@ -328,6 +430,14 @@ function gameLoop() {
         l.draw();
     });
 
+    // 更新粒子效果
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    // 更新傷害文字
     for (let i = damageTexts.length - 1; i >= 0; i--) {
         damageTexts[i].update();
         damageTexts[i].draw();
