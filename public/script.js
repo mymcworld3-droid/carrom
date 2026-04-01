@@ -15,6 +15,11 @@ const MIN_SPEED = 0.2;
 const LAUNCH_FORCE_MULT = 0.15; 
 const MAX_DRAG = 150; 
 
+// 🔥 遊戲模式與連線變數
+let gameMode = 'local'; // 'single', 'local', 'online'
+let myTeam = 'blue';    // 連線模式下的玩家隊伍
+let socket = null;      // Socket.io 實例
+
 // 🔥 動態攝影機與時間參數
 let camera = { x: 400, y: 300, zoom: 1, targetZoom: 1, targetX: 400, targetY: 300 };
 let timeScale = 1.0;
@@ -128,9 +133,16 @@ class Leopard {
         ctx.fill();
         
         if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
-            ctx.strokeStyle = 'yellow';
-            ctx.lineWidth = 5;
-            ctx.stroke();
+            // 🔥 連線模式只有自己的回合會亮黃圈
+            if (gameMode !== 'online' || currentTurn === myTeam) {
+                ctx.strokeStyle = 'yellow';
+                ctx.lineWidth = 5;
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
         } else {
             ctx.strokeStyle = this.hasMoved ? '#444' : 'white';
             ctx.lineWidth = 3;
@@ -187,6 +199,76 @@ class Leopard {
     }
 }
 
+// 🔥 新增：連線模式初始化
+function initOnlineMode() {
+    if (typeof io === 'undefined') {
+        alert('未偵測到 Socket.io 函式庫，請檢查 HTML 引入');
+        return;
+    }
+    socket = io();
+
+    socket.on('initTeam', (assignedTeam) => {
+        myTeam = assignedTeam;
+        console.log(`你是 ${myTeam === 'blue' ? '藍隊' : '紅隊'}`);
+    });
+
+    socket.on('opponentMove', (data) => {
+        const leopard = leopards.find(l => l.id === data.id);
+        if (leopard) {
+            leopard.vx = data.vx;
+            leopard.vy = data.vy;
+            leopard.hasMoved = true;
+            isProcessing = true;
+        }
+    });
+
+    // 每回合結束同步狀態，防止物理模擬分歧
+    socket.on('syncState', (data) => {
+        data.leopards.forEach(remoteL => {
+            const localL = leopards.find(l => l.id === remoteL.id);
+            if (localL) {
+                localL.x = remoteL.x;
+                localL.y = remoteL.y;
+                localL.hp = remoteL.hp;
+            }
+        });
+        blueKills = data.blueKills;
+        redKills = data.redKills;
+        updateExternalUI();
+    });
+}
+
+// 🔥 新增：AI 行動邏輯
+function makeAIMove() {
+    if (gameOver || isProcessing) return;
+
+    const aiLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
+    if (aiLeopards.length === 0) return;
+
+    // 隨機選擇一隻紅隊豹豹
+    const attacker = aiLeopards[Math.floor(Math.random() * aiLeopards.length)];
+    // 瞄準最近的藍隊隊員
+    const enemies = leopards.filter(l => l.team === 'blue' && !l.isDying);
+    if (enemies.length === 0) return;
+
+    let closestEnemy = enemies[0];
+    let minDist = Infinity;
+    enemies.forEach(e => {
+        const d = Math.sqrt((e.x - attacker.x)**2 + (e.y - attacker.y)**2);
+        if (d < minDist) { minDist = d; closestEnemy = e; }
+    });
+
+    const dx = closestEnemy.x - attacker.x;
+    const dy = closestEnemy.y - attacker.y;
+    const angle = Math.atan2(dy, dx);
+    const force = Math.min(minDist * 0.4, MAX_DRAG);
+
+    attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.hasMoved = true;
+    isProcessing = true;
+}
+
 function getPredictedCollision(attacker, dx, dy) {
     const angle = Math.atan2(dy, dx);
     const rayVx = Math.cos(angle);
@@ -241,12 +323,11 @@ function updateExternalUI() {
     const bDots = blueDotsContainer.children;
     const rDots = redDotsContainer.children;
     for (let i = 0; i < 5; i++) {
-        bDots[i].classList.toggle('blue-fill', i < blueKills);
-        rDots[i].classList.toggle('red-fill', i < redKills);
+        if (bDots[i]) bDots[i].classList.toggle('blue-fill', i < blueKills);
+        if (rDots[i]) rDots[i].classList.toggle('red-fill', i < redKills);
     }
 
     if (currentActionDamage > 0) {
-        // 🔥 更新傷害文字並觸發縮放動畫
         actionDamageEl.innerText = `💥 行動總傷: ${Math.floor(currentActionDamage)}`;
         actionDamageEl.style.opacity = '1';
         actionDamageEl.style.transform = 'scale(1.2)';
@@ -388,7 +469,6 @@ function checkTurnSystem() {
     
     if (isProcessing && activeLeopards.length === 0 && !isSlowMo) {
         isProcessing = false;
-        
         leopards.forEach(l => { if (l.isDying) respawnLeopard(l); });
 
         const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
@@ -396,6 +476,10 @@ function checkTurnSystem() {
 
         if (nextTeamCanMove) {
             currentTurn = nextTeam;
+            // 🔥 單人模式 AI 行動
+            if (gameMode === 'single' && currentTurn === 'red') {
+                setTimeout(makeAIMove, 800);
+            }
         } else {
             const currentTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
             if (!currentTeamCanMove) {
@@ -407,7 +491,16 @@ function checkTurnSystem() {
         actionDamageEl.style.opacity = '0';
         currentActionDamage = 0;
 
-        turnDisplay.innerText = `輪到${currentTurn === 'blue' ? '藍隊' : '紅隊'}彈射 1 隻`;
+        // 🔥 連線模式下同步所有座標到 Server（由藍隊主導同步）
+        if (gameMode === 'online' && myTeam === 'blue') {
+            socket.emit('syncRequest', {
+                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp })),
+                blueKills,
+                redKills
+            });
+        }
+
+        turnDisplay.innerText = `輪到${currentTurn === 'blue' ? '藍隊' : '紅隊'}彈射`;
     }
 }
 
@@ -428,6 +521,9 @@ function getPointerPos(e) {
 
 function handleStart(e) {
     if (isProcessing || gameOver) return;
+    // 🔥 連線模式檢查是否為自己的隊伍
+    if (gameMode === 'online' && currentTurn !== myTeam) return;
+
     const pos = getPointerPos(e);
     leopards.forEach(l => {
         if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
@@ -455,16 +551,29 @@ function handleEnd(e) {
     let dx = selectedLeopard.x - dragEndPos.x;
     let dy = selectedLeopard.y - dragEndPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > MAX_DRAG) {
-        const ratio = MAX_DRAG / dist;
-        dx *= ratio; dy *= ratio;
+    
+    if (dist > 5) {
+        if (dist > MAX_DRAG) {
+            const ratio = MAX_DRAG / dist;
+            dx *= ratio; dy *= ratio;
+        }
+
+        const vx = dx * LAUNCH_FORCE_MULT;
+        const vy = dy * LAUNCH_FORCE_MULT;
+
+        // 🔥 連線模式發送行動給對方
+        if (gameMode === 'online') {
+            socket.emit('playerMove', { id: selectedLeopard.id, vx, vy });
+        }
+
+        selectedLeopard.vx = vx;
+        selectedLeopard.vy = vy;
+        selectedLeopard.hasMoved = true;
+        isProcessing = true;
     }
-    selectedLeopard.vx = dx * LAUNCH_FORCE_MULT;
-    selectedLeopard.vy = dy * LAUNCH_FORCE_MULT;
-    selectedLeopard.hasMoved = true;
+
     isDragging = false;
     selectedLeopard = null;
-    isProcessing = true;
 }
 
 canvas.addEventListener('mousedown', handleStart);
@@ -587,5 +696,19 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// 🔥 新增：啟動遊戲的入口函式（可從 HTML 按鈕呼叫）
+window.startGame = function(mode) {
+    gameMode = mode;
+    document.getElementById('menu-layer').style.display = 'none';
+    document.getElementById('score-container').style.display = 'flex';
+    document.getElementById('game-container').style.display = 'block';
+    
+    if (mode === 'online') {
+        initOnlineMode();
+    }
+    initGame();
+};
+
+// 預設執行
 initGame();
 gameLoop();
