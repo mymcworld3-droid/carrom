@@ -40,24 +40,23 @@ class Leopard {
         ctx.fillStyle = this.color;
         ctx.fill();
         
-        ctx.strokeStyle = this.hasMoved ? '#555' : 'white';
-        ctx.lineWidth = 3;
-        ctx.stroke();
+        // 🔥 外框視覺：如果本輪已動過，變灰色；若輪到它，給予黃色發光
+        if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        } else {
+            ctx.strokeStyle = this.hasMoved ? '#444' : 'white';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
         ctx.closePath();
 
+        // 血條
         ctx.fillStyle = 'red';
         ctx.fillRect(this.x - 20, this.y - this.radius - 10, 40, 5);
         ctx.fillStyle = 'green';
         ctx.fillRect(this.x - 20, this.y - this.radius - 10, (this.hp / 100) * 40, 5);
-        
-        if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI * 2);
-            ctx.strokeStyle = 'yellow';
-            ctx.setLineDash([5, 5]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
     }
 
     update() {
@@ -132,6 +131,7 @@ function resolveCollisions() {
     }
 }
 
+// 🔥 核心修改：輪流彈射邏輯
 function checkTurnSystem() {
     const activeLeopards = leopards.filter(l => Math.abs(l.vx) > 0 || Math.abs(l.vy) > 0);
     
@@ -140,14 +140,25 @@ function checkTurnSystem() {
         leopards = leopards.filter(l => l.hp > 0);
         updateUI();
 
-        const teamMembers = leopards.filter(l => l.team === currentTurn);
-        const allMoved = teamMembers.every(l => l.hasMoved);
+        // 1. 先確認對方是否還有可動的豹豹
+        const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
+        const nextTeamCanMove = leopards.some(l => l.team === nextTeam && !l.hasMoved);
 
-        if (allMoved) {
-            currentTurn = currentTurn === 'blue' ? 'red' : 'blue';
-            leopards.forEach(l => { if (l.team === currentTurn) l.hasMoved = false; });
-            turnDisplay.innerText = `目前回合：${currentTurn === 'blue' ? '藍隊' : '紅隊'}`;
+        if (nextTeamCanMove) {
+            // 正常切換到對方
+            currentTurn = nextTeam;
+        } else {
+            // 如果對方沒得動了，檢查自己隊伍是否還有人能動
+            const currentTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
+            if (!currentTeamCanMove) {
+                // 如果兩邊都沒得動了，進入下一輪大回合，重置所有人
+                leopards.forEach(l => l.hasMoved = false);
+                currentTurn = 'blue'; // 或者保留勝者先手邏輯
+            }
+            // 如果自己還能動但對方不能動，currentTurn 就不變，繼續讓當前隊伍動
         }
+        
+        turnDisplay.innerText = `輪到${currentTurn === 'blue' ? '藍隊' : '紅隊'}彈射 1 隻`;
     }
 }
 
@@ -159,7 +170,6 @@ function updateUI() {
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
-    
     if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
@@ -167,11 +177,7 @@ function getPointerPos(e) {
         clientX = e.clientX;
         clientY = e.clientY;
     }
-    
-    return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-    };
+    return { x: clientX - rect.left, y: clientY - rect.top };
 }
 
 function handleStart(e) {
@@ -188,11 +194,7 @@ function handleStart(e) {
             }
         }
     });
-    
-    // 🔥 關鍵：攔截事件，防止瀏覽器觸發雙擊或長按
-    if (isDragging) {
-        if (e.cancelable) e.preventDefault();
-    }
+    if (isDragging && e.cancelable) e.preventDefault();
 }
 
 function handleMove(e) {
@@ -200,20 +202,16 @@ function handleMove(e) {
     const pos = getPointerPos(e);
     dragEndPos.x = pos.x;
     dragEndPos.y = pos.y;
-    // 🔥 關鍵：防止拖動豹豹時網頁跟著跑
     if (e.cancelable) e.preventDefault();
 }
 
 function handleEnd(e) {
     if (!isDragging) return;
-
     const dx = selectedLeopard.x - dragEndPos.x;
     const dy = selectedLeopard.y - dragEndPos.y;
-
     selectedLeopard.vx = dx * LAUNCH_FORCE_MULT;
     selectedLeopard.vy = dy * LAUNCH_FORCE_MULT;
     selectedLeopard.hasMoved = true;
-
     isDragging = false;
     selectedLeopard = null;
     isProcessing = true;
@@ -221,16 +219,13 @@ function handleEnd(e) {
 
 canvas.addEventListener('mousedown', handleStart);
 canvas.addEventListener('touchstart', handleStart, { passive: false });
-
 window.addEventListener('mousemove', handleMove, { passive: false });
 window.addEventListener('touchmove', handleMove, { passive: false });
-
 window.addEventListener('mouseup', handleEnd);
 window.addEventListener('touchend', handleEnd);
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     if (isDragging && selectedLeopard) {
         ctx.beginPath();
         ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
@@ -239,7 +234,6 @@ function gameLoop() {
         ctx.setLineDash([5, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
-        
         const dx = selectedLeopard.x - dragEndPos.x;
         const dy = selectedLeopard.y - dragEndPos.y;
         ctx.beginPath();
@@ -248,15 +242,12 @@ function gameLoop() {
         ctx.strokeStyle = 'yellow';
         ctx.stroke();
     }
-
     leopards.forEach(l => {
         l.update();
         l.draw();
     });
-
     resolveCollisions();
     checkTurnSystem();
-
     requestAnimationFrame(gameLoop);
 }
 
