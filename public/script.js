@@ -20,14 +20,14 @@ let selectedLeopard = null;
 let dragEndPos = { x: 0, y: 0 };
 let isProcessing = false; 
 
-// 傷害數字類別
+// 🔥 傷害數字跳出效果
 class DamageText {
     constructor(x, y, value) {
         this.x = x;
         this.y = y;
         this.value = value;
         this.life = 60; 
-        this.vy = -2;   
+        this.vy = -2.5; // 向上飄
         this.opacity = 1;
     }
     update() {
@@ -38,11 +38,12 @@ class DamageText {
     draw() {
         ctx.save();
         ctx.globalAlpha = this.opacity;
-        ctx.fillStyle = '#ffcc00';
-        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#ffcc00'; // 醒目的亮黃色
+        ctx.font = 'bold 28px Arial';
         ctx.textAlign = 'center';
-        // 顯示整數傷害
-        ctx.fillText(`-${Math.floor(this.value)}`, this.x, this.y);
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText(`-${this.value}`, this.x, this.y);
         ctx.restore();
     }
 }
@@ -68,10 +69,10 @@ class Leopard {
         ctx.fillStyle = this.color;
         ctx.fill();
         
-        // 外框視覺
+        // 輪到該豹豹時的外框特效
         if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
             ctx.strokeStyle = 'yellow';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 5;
             ctx.stroke();
         } else {
             ctx.strokeStyle = this.hasMoved ? '#444' : 'white';
@@ -80,11 +81,11 @@ class Leopard {
         }
         ctx.closePath();
 
-        // 🔥 改到豹豹下方顯示：❤️（生命值）🗡️（攻擊力）
+        // 🔥 顯示在豹豹下方：❤️ 生命值 🗡️ 攻擊力
         ctx.fillStyle = 'white';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(`❤️${Math.ceil(this.hp)}  🗡️${this.atk}`, this.x, this.y + this.radius + 25);
+        ctx.fillText(`❤️${Math.max(0, Math.ceil(this.hp))}  🗡️${this.atk}`, this.x, this.y + this.radius + 25);
     }
 
     update() {
@@ -108,19 +109,18 @@ class Leopard {
 }
 
 function initGame() {
-    // 🔥 陣型調整：中間的豹豹往前推進 (V字型)
+    // 🔥 中間豹豹往前推進的陣型
     leopards = [
         new Leopard(150, 200, 25, '#3498db', 'blue', 1),
-        new Leopard(230, 300, 25, '#3498db', 'blue', 2), // 藍隊往前
+        new Leopard(240, 300, 25, '#3498db', 'blue', 2), // 藍隊往前
         new Leopard(150, 400, 25, '#3498db', 'blue', 3),
         
         new Leopard(650, 200, 25, '#e74c3c', 'red', 4),
-        new Leopard(570, 300, 25, '#e74c3c', 'red', 5),  // 紅隊往前
+        new Leopard(560, 300, 25, '#e74c3c', 'red', 5),  // 紅隊往前
         new Leopard(650, 400, 25, '#e74c3c', 'red', 6)
     ];
 }
 
-// 🔥 修改後的碰撞與傷害邏輯
 function resolveCollisions() {
     for (let i = 0; i < leopards.length; i++) {
         for (let j = i + 1; j < leopards.length; j++) {
@@ -131,24 +131,31 @@ function resolveCollisions() {
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < b1.radius + b2.radius) {
-                // 🔥 傷害邏輯修復
+                // 🔥 傷害判定：己方攻擊時，碰到對方的任何碰撞都會造成傷害
                 if (b1.team !== b2.team) {
                     let relVx = b1.vx - b2.vx;
                     let relVy = b1.vy - b2.vy;
-                    // 內積大於 0 代表兩者正在接近（發生撞擊）
+                    // dotProduct > 0 表示兩顆球正在互相靠近
                     let dotProduct = relVx * dx + relVy * dy;
 
-                    if (dotProduct > 0) { 
-                        // 判定誰是己方（攻擊者），誰是對方（受害者）
-                        let attacker = (b1.team === currentTurn) ? b1 : b2;
-                        let victim = (attacker === b1) ? b2 : b1;
+                    if (dotProduct > 0) {
+                        let attacker, victim;
+                        // 判定誰是己方 (目前回合方)
+                        if (b1.team === currentTurn) {
+                            attacker = b1;
+                            victim = b2;
+                        } else {
+                            attacker = b2;
+                            victim = b1;
+                        }
                         
+                        // 造成傷害
                         victim.hp -= attacker.atk;
-                        damageTexts.push(new DamageText(victim.x, victim.y - 20, attacker.atk));
+                        damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk));
                     }
                 }
 
-                // 彈性碰撞物理計算
+                // 彈性碰撞物理反彈
                 let collisionAngle = Math.atan2(dy, dx);
                 let speed1 = Math.sqrt(b1.vx * b1.vx + b1.vy * b1.vy);
                 let speed2 = Math.sqrt(b2.vx * b2.vx + b2.vy * b2.vy);
@@ -165,7 +172,7 @@ function resolveCollisions() {
                 b2.vx = Math.cos(collisionAngle) * vx1 + Math.cos(collisionAngle + Math.PI / 2) * vy2;
                 b2.vy = Math.sin(collisionAngle) * vx1 + Math.sin(collisionAngle + Math.PI / 2) * vy2;
 
-                // 防止重疊
+                // 防止重疊卡死
                 let overlap = b1.radius + b2.radius - distance;
                 b1.x -= Math.cos(collisionAngle) * (overlap / 2);
                 b1.y -= Math.sin(collisionAngle) * (overlap / 2);
@@ -176,14 +183,14 @@ function resolveCollisions() {
     }
 }
 
-// 🔥 繪製實心箭頭
+// 🔥 繪製箭頭功能
 function drawArrow(context, fromx, fromy, tox, toy) {
     const headlen = 15; 
     const angle = Math.atan2(toy - fromy, tox - fromx);
     
     context.save();
     context.strokeStyle = 'yellow';
-    context.lineWidth = 4;
+    context.lineWidth = 5;
     context.beginPath();
     context.moveTo(fromx, fromy);
     context.lineTo(tox, toy);
@@ -200,7 +207,7 @@ function drawArrow(context, fromx, fromy, tox, toy) {
 }
 
 function checkTurnSystem() {
-    const activeLeopards = leopards.filter(l => Math.abs(l.vx) > 0.01 || Math.abs(l.vy) > 0.01);
+    const activeLeopards = leopards.filter(l => Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05);
     
     if (isProcessing && activeLeopards.length === 0) {
         isProcessing = false;
@@ -288,7 +295,7 @@ window.addEventListener('touchend', handleEnd);
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 繪製拉弓輔助線與箭頭
+    // 拉弓預測
     if (isDragging && selectedLeopard) {
         ctx.beginPath();
         ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
@@ -300,6 +307,7 @@ function gameLoop() {
         
         const dx = selectedLeopard.x - dragEndPos.x;
         const dy = selectedLeopard.y - dragEndPos.y;
+        // 🔥 繪製指向箭頭
         drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + dx, selectedLeopard.y + dy);
     }
 
@@ -308,7 +316,7 @@ function gameLoop() {
         l.draw();
     });
 
-    // 傷害文字動畫
+    // 更新與顯示傷害文字
     for (let i = damageTexts.length - 1; i >= 0; i--) {
         damageTexts[i].update();
         damageTexts[i].draw();
