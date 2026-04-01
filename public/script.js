@@ -133,7 +133,7 @@ class Leopard {
         ctx.fill();
         
         if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
-            // 🔥 連線模式只有自己的回合會亮黃圈
+            // 連線模式只有自己的回合會亮黃圈
             if (gameMode !== 'online' || currentTurn === myTeam) {
                 ctx.strokeStyle = 'yellow';
                 ctx.lineWidth = 5;
@@ -199,7 +199,7 @@ class Leopard {
     }
 }
 
-// 🔥 新增：連線模式初始化
+// 🔥 連線模式初始化
 function initOnlineMode() {
     if (typeof io === 'undefined') {
         alert('未偵測到 Socket.io 函式庫，請檢查 HTML 引入');
@@ -238,7 +238,7 @@ function initOnlineMode() {
     });
 }
 
-// 🔥 新增：AI 行動邏輯
+// 🔥 AI 行動邏輯
 function makeAIMove() {
     if (gameOver || isProcessing) return;
 
@@ -476,7 +476,7 @@ function checkTurnSystem() {
 
         if (nextTeamCanMove) {
             currentTurn = nextTeam;
-            // 🔥 單人模式 AI 行動
+            // 單人模式 AI 行動
             if (gameMode === 'single' && currentTurn === 'red') {
                 setTimeout(makeAIMove, 800);
             }
@@ -491,7 +491,7 @@ function checkTurnSystem() {
         actionDamageEl.style.opacity = '0';
         currentActionDamage = 0;
 
-        // 🔥 連線模式下同步所有座標到 Server（由藍隊主導同步）
+        // 連線模式下同步所有座標到 Server（由藍隊主導同步）
         if (gameMode === 'online' && myTeam === 'blue') {
             socket.emit('syncRequest', {
                 leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp })),
@@ -521,7 +521,7 @@ function getPointerPos(e) {
 
 function handleStart(e) {
     if (isProcessing || gameOver) return;
-    // 🔥 連線模式檢查是否為自己的隊伍
+    // 連線模式檢查是否為自己的隊伍
     if (gameMode === 'online' && currentTurn !== myTeam) return;
 
     const pos = getPointerPos(e);
@@ -561,7 +561,7 @@ function handleEnd(e) {
         const vx = dx * LAUNCH_FORCE_MULT;
         const vy = dy * LAUNCH_FORCE_MULT;
 
-        // 🔥 連線模式發送行動給對方
+        // 連線模式發送行動給對方
         if (gameMode === 'online') {
             socket.emit('playerMove', { id: selectedLeopard.id, vx, vy });
         }
@@ -696,19 +696,30 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// 🔥 新增：啟動遊戲的入口函式（可從 HTML 按鈕呼叫）
+// 🔥 啟動遊戲的入口函式
 window.startGame = function(mode) {
     gameMode = mode;
-    document.getElementById('menu-layer').style.display = 'none';
-    document.getElementById('score-container').style.display = 'flex';
-    document.getElementById('game-container').style.display = 'block';
     
-    if (mode === 'online') {
-        initOnlineMode();
-    }
-    initGame();
+    const menu = document.getElementById('menu-layer');
+    const game = document.getElementById('game-layer');
+
+    // 開始淡出選單
+    menu.style.opacity = '0';
+    
+    setTimeout(() => {
+        // 隱藏選單並顯示遊戲圖層
+        menu.style.display = 'none';
+        game.style.display = 'flex';
+        
+        if (mode === 'online') {
+            initOnlineMode();
+        }
+        
+        // 初始化豹豹與計分板
+        initGame();
+        updateExternalUI();
+    }, 500);
 };
 
-// 預設執行
-initGame();
+// 啟動主迴圈（物體會在 startGame 呼叫 initGame 後產生）
 gameLoop();
