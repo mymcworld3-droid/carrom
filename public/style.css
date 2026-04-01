@@ -1,0 +1,55 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #1a1a2e;
+    font-family: "Microsoft JhengHei", sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    border: 4px solid #4ecca3;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+.stats {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#score-board {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 20px;
+}
+
+.team {
+    padding: 5px 15px;
+    border-radius: 20px;
+    background: rgba(0,0,0,0.5);
+}
+
+.blue { color: #3498db; border: 1px solid #3498db; }
+.red { color: #e74c3c; border: 1px solid #e74c3c; }
+
+canvas {
+    background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
+    display: block;
+}
