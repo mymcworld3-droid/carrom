@@ -5,7 +5,6 @@ body {
     font-family: "Microsoft JhengHei", sans-serif;
     display: flex;
     flex-direction: column;
-    /* 🔥 將介面對齊最上方並大幅縮小頂部間距 */
     justify-content: flex-start;
     padding-top: 10px; 
     align-items: center;
@@ -16,98 +15,9 @@ body {
     user-select: none;
 }
 
-/* 外部計分容器樣式 */
-#score-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 800px;
-    /* 🔥 縮小計分板與遊戲框之間的距離 */
-    margin-bottom: 5px;
-}
-
-#game-title {
-    color: white;
-    font-size: 24px;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
-}
-
-.dots-group {
-    display: flex;
-    gap: 8px;
-}
-
-.dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background-color: #444;
-    border: 2px solid white;
-    transition: background-color 0.3s, box-shadow 0.3s;
-}
-
-.dot.blue-fill { background-color: #3498db; box-shadow: 0 0 8px #3498db; }
-.dot.red-fill { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
-
-#game-container {
-    position: relative;
-    border: 4px solid #4ecca3;
-    border-radius: 10px;
-    box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
-    touch-action: none;
-}
-
-/* 行動傷害文字樣式：位於指令下方 */
-#action-damage-text {
-    display: block;
-    margin-top: 5px;
-    color: #ffcc00;
-    font-size: 36px;
-    font-weight: bold;
-    text-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8);
-    opacity: 0;
-    transition: opacity 0.2s, transform 0.2s;
-    transform: scale(0.8);
-}
-
-#ui-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    pointer-events: none;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-    z-index: 10;
-}
-
-.stats {
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-#turn-display {
-    font-size: 20px;
-    margin-bottom: 2px;
-}
-
-#instruction {
-    font-size: 16px;
-    color: #aaa;
-}
-
-canvas {
-    background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
-    display: block;
-    touch-action: none; 
-    -webkit-tap-highlight-color: transparent;
-}
-
-/* 🔥 在 style.css 中加入/更新以下樣式 */
-
+/* =========================================
+   初始選單介面 (#menu-layer)
+   ========================================= */
 #menu-layer {
     position: fixed;
     top: 0;
@@ -187,15 +97,110 @@ canvas {
     font-size: 12px;
 }
 
-/* 遊戲開始後的顯示容器樣式更新 */
+/* =========================================
+   遊戲主要圖層 (#game-layer)
+   ========================================= */
 #game-layer {
-    display: flex;
+    display: none; /* 初始隱藏，由 JS 的 startGame 切換 */
     flex-direction: column;
     align-items: center;
     padding-top: 10px;
     animation: fadeIn 1s ease;
 }
 
+/* 外部計分容器樣式 */
+#score-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 800px;
+    margin-bottom: 5px;
+}
+
+#game-title {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
+}
+
+.dots-group {
+    display: flex;
+    gap: 8px;
+}
+
+.dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #444;
+    border: 2px solid white;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.dot.blue-fill { background-color: #3498db; box-shadow: 0 0 8px #3498db; }
+.dot.red-fill { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
+
+/* 遊戲畫布容器 */
+#game-container {
+    position: relative;
+    border: 4px solid #4ecca3;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
+    touch-action: none;
+}
+
+/* 行動傷害文字樣式 */
+#action-damage-text {
+    display: block;
+    margin-top: 5px;
+    color: #ffcc00;
+    font-size: 36px;
+    font-weight: bold;
+    text-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: scale(0.8);
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    z-index: 10;
+}
+
+.stats {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#turn-display {
+    font-size: 20px;
+    margin-bottom: 2px;
+}
+
+#instruction {
+    font-size: 16px;
+    color: #aaa;
+}
+
+canvas {
+    background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
+    display: block;
+    touch-action: none; 
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* =========================================
+   動畫定義
+   ========================================= */
 @keyframes fadeInDown {
     from { opacity: 0; transform: translateY(-30px); }
     to { opacity: 1; transform: translateY(0); }
@@ -204,9 +209,4 @@ canvas {
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
-}
-
-/* 🔥 隱藏原本 script.js 裡面控制的舊 ID */
-#score-container, #game-container {
-    display: none; /* 由 JS 開啟遊戲後切換父容器顯現 */
 }
