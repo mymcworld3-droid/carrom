@@ -8,11 +8,19 @@ const redDotsContainer = document.getElementById('red-score-dots');
 canvas.width = 800;
 canvas.height = 600;
 
+// 🔥 核心物理與效果參數
 const FRICTION = 0.985; 
 const WALL_BOUNCE = 0.8; 
 const MIN_SPEED = 0.2; 
 const LAUNCH_FORCE_MULT = 0.15; 
 const MAX_DRAG = 150; 
+
+// 🔥 動態攝影機與時間參數
+let camera = { x: 400, y: 300, zoom: 1, targetZoom: 1, targetX: 400, targetY: 300 };
+let timeScale = 1.0;
+let targetTimeScale = 1.0;
+let isSlowMo = false;
+let slowMoTimer = 0;
 
 let leopards = [];
 let damageTexts = []; 
@@ -35,22 +43,25 @@ class Particle {
         this.x = x;
         this.y = y;
         this.color = color;
-        this.vx = (Math.random() - 0.5) * 12;
-        this.vy = (Math.random() - 0.5) * 12;
-        this.life = 40 + Math.random() * 20;
-        this.size = Math.random() * 6 + 2;
+        this.vx = (Math.random() - 0.5) * 15;
+        this.vy = (Math.random() - 0.5) * 15;
+        this.life = 40 + Math.random() * 30;
+        this.size = Math.random() * 8 + 2;
     }
     update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vx *= 0.95;
-        this.vy *= 0.95;
-        this.life--;
+        // 受時間縮放影響
+        this.x += this.vx * timeScale;
+        this.y += this.vy * timeScale;
+        this.vx *= 0.96;
+        this.vy *= 0.96;
+        this.life -= 1 * timeScale;
     }
     draw() {
         ctx.save();
-        ctx.globalAlpha = this.life / 60;
+        ctx.globalAlpha = Math.max(0, this.life / 70);
         ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
@@ -59,26 +70,34 @@ class Particle {
 }
 
 class DamageText {
-    constructor(x, y, value) {
+    constructor(x, y, value, isSpecial = false) {
         this.x = x;
         this.y = y;
         this.value = value;
-        this.life = 60; 
-        this.vy = -2.5; 
-        this.opacity = 1;
+        this.life = 80; 
+        this.vy = -1.5; 
+        this.scale = isSpecial ? 2 : 1;
+        this.color = isSpecial ? '#ff3333' : '#ffcc00';
     }
     update() {
-        this.y += this.vy;
-        this.life--;
-        this.opacity = this.life / 60;
+        this.y += this.vy * timeScale;
+        this.life -= 1 * timeScale;
     }
     draw() {
+        if (this.life <= 0) return;
         ctx.save();
-        ctx.globalAlpha = this.opacity;
-        ctx.fillStyle = '#ffcc00'; 
-        ctx.font = 'bold 28px Arial';
+        ctx.font = `bold ${24 * this.scale}px "Microsoft JhengHei"`;
         ctx.textAlign = 'center';
-        ctx.fillText(`-${Math.floor(this.value)}`, this.x, this.y);
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'black';
+        
+        // 模擬圖片中的跳動感
+        const bounce = Math.sin(this.life * 0.1) * 5;
+        ctx.fillStyle = 'white';
+        ctx.fillText(this.value, this.x, this.y + bounce);
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+        ctx.strokeText(this.value, this.x, this.y + bounce);
         ctx.restore();
     }
 }
@@ -100,11 +119,14 @@ class Leopard {
     }
 
     draw() {
-        if (this.isDying) return; 
+        if (this.isDying && !isSlowMo) return; 
 
+        ctx.save();
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
         ctx.fill();
         
         if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
@@ -122,13 +144,15 @@ class Leopard {
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(`❤️${Math.max(0, Math.ceil(this.hp))}  🗡️${this.atk}`, this.x, this.y + this.radius + 25);
+        ctx.restore();
     }
 
     update() {
         if (this.isDying) return;
 
-        this.x += this.vx;
-        this.y += this.vy;
+        // 位移受 timeScale 影響
+        this.x += this.vx * timeScale;
+        this.y += this.vy * timeScale;
         this.vx *= FRICTION;
         this.vy *= FRICTION;
 
@@ -147,7 +171,16 @@ class Leopard {
 
     die() {
         this.isDying = true;
-        for (let i = 0; i < 25; i++) {
+        
+        // 🔥 觸發特寫效果
+        isSlowMo = true;
+        slowMoTimer = 60; // 持續 60 幀的特寫
+        targetTimeScale = 0.1; // 極慢動作
+        camera.targetZoom = 2.5; // 放大
+        camera.targetX = this.x;
+        camera.targetY = this.y;
+
+        for (let i = 0; i < 30; i++) {
             particles.push(new Particle(this.x, this.y, this.color));
         }
         
@@ -159,7 +192,6 @@ class Leopard {
     }
 }
 
-// 🔥 預測碰撞邏輯
 function getPredictedCollision(attacker, dx, dy) {
     const angle = Math.atan2(dy, dx);
     const rayVx = Math.cos(angle);
@@ -219,7 +251,7 @@ function updateExternalUI() {
     }
 
     if (currentActionDamage > 0) {
-        actionDamageEl.innerText = `💥 行動傷害: ${Math.floor(currentActionDamage)}`;
+        actionDamageEl.innerText = `💥 行動總傷: ${Math.floor(currentActionDamage)}`;
         actionDamageEl.style.opacity = '1';
     }
 }
@@ -298,7 +330,7 @@ function resolveCollisions() {
                         currentActionDamage += attacker.atk;
                         updateExternalUI();
 
-                        damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk));
+                        damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk, victim.hp <= 0));
                         if (victim.hp <= 0) victim.die();
                     }
                 }
@@ -354,7 +386,7 @@ function checkTurnSystem() {
 
     const activeLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
-    if (isProcessing && activeLeopards.length === 0) {
+    if (isProcessing && activeLeopards.length === 0 && !isSlowMo) {
         isProcessing = false;
         
         leopards.forEach(l => { if (l.isDying) respawnLeopard(l); });
@@ -389,7 +421,10 @@ function getPointerPos(e) {
         clientX = e.clientX;
         clientY = e.clientY;
     }
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    // 🔥 修正攝影機縮放後的點擊座標偏移
+    const x = (clientX - rect.left - canvas.width/2) / camera.zoom + camera.x;
+    const y = (clientY - rect.top - canvas.height/2) / camera.zoom + camera.y;
+    return { x, y };
 }
 
 function handleStart(e) {
@@ -398,7 +433,7 @@ function handleStart(e) {
     leopards.forEach(l => {
         if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
             let dist = Math.sqrt((pos.x - l.x)**2 + (pos.y - l.y)**2);
-            if (dist < l.radius) {
+            if (dist < l.radius * 1.5) { // 🔥 增大點擊判定，方便角落發射
                 selectedLeopard = l;
                 isDragging = true;
                 dragEndPos = { x: pos.x, y: pos.y };
@@ -440,16 +475,44 @@ window.addEventListener('touchmove', handleMove, { passive: false });
 window.addEventListener('mouseup', handleEnd);
 window.addEventListener('touchend', handleEnd);
 
+function updateCameraAndSlowMo() {
+    // 🔥 時間縮放平滑轉移
+    timeScale += (targetTimeScale - timeScale) * 0.1;
+    
+    if (isSlowMo) {
+        slowMoTimer--;
+        if (slowMoTimer <= 0) {
+            isSlowMo = false;
+            targetTimeScale = 1.0;
+            camera.targetZoom = 1.0;
+            camera.targetX = 400;
+            camera.targetY = 300;
+        }
+    }
+
+    // 🔥 攝影機平滑轉移 (Lerp)
+    camera.zoom += (camera.targetZoom - camera.zoom) * 0.1;
+    camera.x += (camera.targetX - camera.x) * 0.1;
+    camera.y += (camera.targetY - camera.y) * 0.1;
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    updateCameraAndSlowMo();
+
+    // 🔴 套用攝影機變換
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(camera.zoom, camera.zoom);
+    ctx.translate(-camera.x, -camera.y);
+
     if (isDragging && selectedLeopard) {
         let dx = selectedLeopard.x - dragEndPos.x;
         let dy = selectedLeopard.y - dragEndPos.y;
         const dist = Math.sqrt(dx**2 + dy**2);
         
         if (dist > 5) {
-            // 限制最大力道
             let limitedDx = dx;
             let limitedDy = dy;
             if (dist > MAX_DRAG) {
@@ -460,7 +523,6 @@ function gameLoop() {
             const prediction = getPredictedCollision(selectedLeopard, limitedDx, limitedDy);
             
             if (prediction.hit) {
-                // 1. 到碰撞點的虛線
                 ctx.save();
                 ctx.beginPath();
                 ctx.setLineDash([8, 6]);
@@ -471,7 +533,6 @@ function gameLoop() {
                 ctx.stroke();
                 ctx.restore();
 
-                // 2. 圓圈虛影
                 ctx.save();
                 ctx.globalAlpha = 0.4;
                 ctx.beginPath();
@@ -483,29 +544,19 @@ function gameLoop() {
                 ctx.fill();
                 ctx.restore();
 
-                // 3. 物理動量分配預測 (紅色與黃色箭頭長度隨力道改變)
                 const vLaunchX = limitedDx * LAUNCH_FORCE_MULT;
                 const vLaunchY = limitedDy * LAUNCH_FORCE_MULT;
-                
-                // 法線向量 (Ghost -> Target)
                 const nx = (prediction.target.x - prediction.ghostX) / (selectedLeopard.radius + prediction.target.radius);
                 const ny = (prediction.target.y - prediction.ghostY) / (selectedLeopard.radius + prediction.target.radius);
-                
-                // 投影 (傳遞給目標的衝量)
                 const dot = vLaunchX * nx + vLaunchY * ny;
-                
-                // 被擊中者向量 (紅色箭頭)
                 const vVictimX = dot * nx;
                 const vVictimY = dot * ny;
-                
-                // 本身碰撞後向量 (黃色箭頭 = 原始向量 - 傳遞向量)
                 const vAttackerX = vLaunchX - vVictimX;
                 const vAttackerY = vLaunchY - vVictimY;
 
-                const arrowScale = 6; // 視覺縮放係數
+                const arrowScale = 6;
                 drawArrow(ctx, prediction.target.x, prediction.target.y, prediction.target.x + vVictimX * arrowScale, prediction.target.y + vVictimY * arrowScale, '#ff4444');
                 drawArrow(ctx, prediction.ghostX, prediction.ghostY, prediction.ghostX + vAttackerX * arrowScale, prediction.ghostY + vAttackerY * arrowScale, 'yellow');
-
             } else {
                 ctx.save();
                 ctx.setLineDash([8, 6]);
@@ -534,6 +585,9 @@ function gameLoop() {
 
     resolveCollisions();
     checkTurnSystem();
+
+    ctx.restore(); // 🔴 結束攝影機變換
+
     requestAnimationFrame(gameLoop);
 }
 
