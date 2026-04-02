@@ -500,32 +500,47 @@ function respawnLeopard(leopard) {
 
 // 🔥 修改 script.js 中的 initOnlineMode 函式
 function initOnlineMode() {
-    if (typeof io === 'undefined') return;
+    if (typeof io === 'undefined') {
+        alert("找不到 Socket.io，請確認伺服器運作中");
+        return;
+    }
+    if (socket) return; // 防止重複初始化
+
     socket = io();
 
     socket.on('initTeam', (assignedTeam) => {
         myTeam = assignedTeam;
         const colorName = myTeam === 'blue' ? '藍隊' : '紅隊';
         document.getElementById('selection-title').innerText = `你是 ${colorName} - 請配置隊伍`;
+        console.log(`分配隊伍: ${myTeam}`);
     });
 
-    // 接收對手選好的豹種
+    // 接收對手配置
     socket.on('opponentReady', (data) => {
         if (data.team === 'blue') blueTeamConfig = data.config;
         else redTeamConfig = data.config;
-        console.log('對手已準備完成');
+        console.log('對手配置已同步');
     });
 
-    // 雙方都選好，正式進入遊戲
+    // 雙方準備就緒，進入遊戲
     socket.on('allPlayersReady', () => {
-        showBigAnnouncement("雙方準備就緒！", "gold");
-        setTimeout(startGame, 1000);
+        showBigAnnouncement("雙方就緒！戰鬥開始", "gold");
+        setTimeout(() => {
+            // 切換 UI
+            document.getElementById('selection-layer').style.display = 'none';
+            document.getElementById('game-layer').style.display = 'flex';
+            
+            initGame(); // 產生豹豹
+            updateExternalUI();
+            updateTurnDisplay();
+        }, 1500);
     });
 
+    // 處理對手移動
     socket.on('opponentMove', (data) => {
         const leopard = leopards.find(l => l.id === data.id);
         if (leopard) {
-            activeStriker = leopard; // 記錄對手彈射的那隻
+            activeStriker = leopard;
             leopard.vx = data.vx;
             leopard.vy = data.vy;
             leopard.hasMoved = true;
@@ -533,15 +548,13 @@ function initOnlineMode() {
         }
     });
 
-    // 強制座標校準（防止物理模擬分歧）
+    // 狀態校準：由藍隊（通常是房主）發出的權威狀態
     socket.on('updateClientState', (data) => {
         data.leopards.forEach(remoteL => {
             const localL = leopards.find(l => l.id === remoteL.id);
             if (localL) {
-                localL.x = remoteL.x;
-                localL.y = remoteL.y;
-                localL.hp = remoteL.hp;
-                localL.atk = remoteL.atk;
+                localL.x = remoteL.x; localL.y = remoteL.y;
+                localL.hp = remoteL.hp; localL.atk = remoteL.atk;
             }
         });
         blueKills = data.blueKills;
