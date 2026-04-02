@@ -407,7 +407,6 @@ function startGame() {
     }
 }
 
-// 🔥 核心物理衝突
 function resolveCollisions() {
     for (let i = 0; i < leopards.length; i++) {
         for (let j = i + 1; j < leopards.length; j++) {
@@ -420,39 +419,62 @@ function resolveCollisions() {
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < b1.radius + b2.radius) {
-                // 🔥 戰吼邏輯：移除 buffedThisTurn 限制，允許複數次增加
+                // 🔥 修正：連線模式下，只有 Host (藍隊) 負責計算傷害與死亡
+                const canProcessDamage = (gameMode !== 'online') || (gameMode === 'online' && myTeam === 'blue');
+
                 if (b1.team === b2.team) {
                     if (activeStriker === b1 || activeStriker === b2) {
                         let striker = (activeStriker === b1) ? b1 : b2;
                         let target = (striker === b1) ? b2 : b1;
-                        
                         if (striker.type === 'support') {
-                            target.atk += 5;
-                            // 每次碰撞都彈出文字
-                            damageTexts.push(new DamageText(target.x, target.y - 40, "戰吼! ATK+5", true));
+                            if (canProcessDamage) {
+                                target.atk += 5;
+                                damageTexts.push(new DamageText(target.x, target.y - 40, "戰吼! ATK+5", true));
+                                // 廣播增益
+                                if (gameMode === 'online') {
+                                    socket.emit('midMoveSync', { roomId: currentRoomId, id: target.id, type: 'buff', value: target.atk });
+                                }
+                            }
                         }
                     }
                 } else {
-                    // 對手碰撞
                     let relVx = b1.vx - b2.vx;
                     let relVy = b1.vy - b2.vy;
                     let dotProduct = relVx * dx + relVy * dy;
 
-                    if (dotProduct > 0) {
+                    if (dotProduct > 0 && canProcessDamage) {
                         let attacker = (b1.team === currentTurn) ? b1 : b2;
                         let victim = (attacker === b1) ? b2 : b1;
                         
                         victim.hp -= attacker.atk;
                         totalDamageDealt += attacker.atk;
                         currentActionDamage += attacker.atk;
-                        updateExternalUI();
-
+                        
+                        // 產生文字與判定死亡
                         damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk, victim.hp <= 0));
-                        if (victim.hp <= 0) victim.die();
+                        
+                        // 廣播傷害給 Client
+                        if (gameMode === 'online') {
+                            socket.emit('midMoveSync', { 
+                                roomId: currentRoomId, 
+                                id: victim.id, 
+                                type: 'damage', 
+                                damage: attacker.atk,
+                                hp: victim.hp 
+                            });
+                        }
+
+                        if (victim.hp <= 0) {
+                            victim.die();
+                            if (gameMode === 'online') {
+                                socket.emit('midMoveSync', { roomId: currentRoomId, id: victim.id, type: 'death' });
+                            }
+                        }
+                        updateExternalUI();
                     }
                 }
 
-                // 彈性碰撞物理
+                // 物理碰撞彈射 (這部分兩邊依然同時模擬，確保畫面流暢)
                 let collisionAngle = Math.atan2(dy, dx);
                 let speed1 = Math.sqrt(b1.vx * b1.vx + b1.vy * b1.vy);
                 let speed2 = Math.sqrt(b2.vx * b2.vx + b2.vy * b2.vy);
