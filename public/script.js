@@ -893,8 +893,14 @@ function handleEnd(e) {
             dx *= ratio; dy *= ratio;
         }
 
-        const vx = dx * LAUNCH_FORCE_MULT;
-        const vy = dy * LAUNCH_FORCE_MULT;
+        let vx = dx * LAUNCH_FORCE_MULT;
+        let vy = dy * LAUNCH_FORCE_MULT;
+
+        // 🔥 疾風豹能力：彈射速度增加 50%
+        if (selectedLeopard.type === 'speedster') {
+            vx *= 1.5;
+            vy *= 1.5;
+        }
 
         // 尋找 handleEnd 函式內的 socket.emit 部分
         if (gameMode === 'online') {
