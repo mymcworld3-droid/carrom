@@ -413,7 +413,6 @@ function resolveCollisions() {
     }
 }
 
-// 🔥 修改 script.js 中的 checkTurnSystem 函式
 function checkTurnSystem() {
     if (gameOver) return;
 
@@ -436,7 +435,6 @@ function checkTurnSystem() {
         } else {
             const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
             if (!currentCanMove) {
-                // 進入下一輪並交換先後手
                 roundCount++;
                 firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
                 currentTurn = firstTeam;
@@ -444,19 +442,19 @@ function checkTurnSystem() {
             }
         }
         
-        // 🔥 跳出大字公告
         const teamColor = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
         const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
         const statusText = currentTurn === firstTeam ? '先手' : '後手';
         showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
 
-        // 🔥 單人模式：若輪到紅方，由 AI 執行
         if (gameMode === 'single' && currentTurn === 'red') {
-            setTimeout(makeAIMove, 1500); // 等大字跑完再射
+            setTimeout(makeAIMove, 1500);
         }
 
+        // 🔥 修正：必須帶入 roomId 才能同步給正確的房間對手
         if (gameMode === 'online' && activeStriker && activeStriker.team === myTeam) {
             socket.emit('syncState', {
+                roomId: currentRoomId, 
                 leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
                 blueKills,
                 redKills,
