@@ -468,14 +468,59 @@ function resolveCollisions() {
     }
 }
 
+// 🔥 修復後的回合管理系統
 function checkTurnSystem() {
     if (gameOver) return;
 
+    // 檢查是否有豹豹還在移動
     const movingLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
+    // 當處理中且物理完全停止，且沒在播放死亡慢動作時
     if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
-        // 🔥 1. 先執行同步，此時 activeStriker 還有值，能判斷是否為「我方彈射」
-        if (gameMode === 'online' && activeStriker && activeStriker.team === myTeam) {
+        // 先暫存目前是誰發動的彈射
+        const wasMyTurn = (gameMode === 'online' && activeStriker && activeStriker.team === myTeam);
+        
+        isProcessing = false;
+
+        // 1. 處理重生與增益清理
+        leopards.forEach(l => { 
+            l.buffedThisTurn = false;
+            if (l.isDying) respawnLeopard(l); 
+        });
+
+        // 2. 切換回合邏輯：直到找到一個有豹豹可以動的隊伍
+        let turnSwitched = false;
+        while (!turnSwitched) {
+            const otherTeam = currentTurn === 'blue' ? 'red' : 'blue';
+            const otherCanMove = leopards.some(l => l.team === otherTeam && !l.hasMoved);
+
+            if (otherCanMove) {
+                currentTurn = otherTeam;
+                turnSwitched = true;
+            } else {
+                const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
+                if (!currentCanMove) {
+                    // 兩邊都沒動作了，重置輪數
+                    roundCount++;
+                    firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
+                    currentTurn = firstTeam;
+                    leopards.forEach(l => l.hasMoved = false);
+                    turnSwitched = true; // 重置後一定有人能動
+                } else {
+                    // 當前隊伍還有剩餘行動次數，繼續輪到他（例如對手全滅或已動完）
+                    turnSwitched = true; 
+                }
+            }
+        }
+
+        // 3. UI 提示
+        const teamColor = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
+        const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
+        const statusText = currentTurn === firstTeam ? '先手' : '後手';
+        showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
+
+        // 4. 連線同步：由發動攻擊的那一方統一發送最終結算狀態
+        if (wasMyTurn) {
             socket.emit('syncState', {
                 roomId: currentRoomId, 
                 leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
@@ -487,44 +532,11 @@ function checkTurnSystem() {
                 nextTurn: currentTurn
             });
         }
-    
-        // 🔥 2. 同步完後再清空狀態
-        isProcessing = false;
-        activeStriker = null;
 
-        leopards.forEach(l => { 
-            l.buffedThisTurn = false;
-            if (l.isDying) respawnLeopard(l); 
-        });
-
-        const otherTeam = currentTurn === 'blue' ? 'red' : 'blue';
-        const otherCanMove = leopards.some(l => l.team === otherTeam && !l.hasMoved);
-
-        if (otherCanMove) {
-            currentTurn = otherTeam;
-        } else {
-            const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
-            if (!currentCanMove) {
-                roundCount++;
-                firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
-                currentTurn = firstTeam;
-                leopards.forEach(l => l.hasMoved = false);
-            }
-        }
-        
-        const teamColor = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
-        const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
-        const statusText = currentTurn === firstTeam ? '先手' : '後手';
-        showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
+        activeStriker = null; // 同步發送後才清理
 
         if (gameMode === 'single' && currentTurn === 'red') {
             setTimeout(makeAIMove, 1500);
-        }
-
-        const targetTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
-        if (!targetTeamCanMove && !gameOver) {
-            checkTurnSystem(); 
-            return;
         }
 
         actionDamageEl.style.opacity = '0';
