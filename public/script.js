@@ -20,7 +20,8 @@ const LEOPARD_TYPES = {
     balanced: { name: '全能豹', icon: '🐾', hp: 100, atk: 20, desc: '屬性均衡，適合新手。' },
     tank: { name: '重裝豹', icon: '🛡️', hp: 150, atk: 15, desc: '高生命力，極難被擊殺。' },
     assassin: { name: '刺客豹', icon: '🗡️', hp: 70, atk: 35, desc: '極高攻擊，但非常脆弱。' },
-    support: { name: '戰吼豹', icon: '🔥', hp: 90, atk: 15, desc: '特殊能力：碰撞我方豹豹時，該隊友攻擊力 +5。' }
+    support: { name: '戰吼豹', icon: '🔥', hp: 90, atk: 15, desc: '特殊能力：碰撞我方豹豹時，該隊友攻擊力 +5 (死後重置)。' },
+    speedster: { name: '疾風豹', icon: '⚡', hp: 80, atk: 15, desc: '特殊能力：初始彈射速度增加 50%，且每次碰撞牆壁增加 10 點攻擊力 (回合結束重置)。' }
 };
 
 // 🔥 遊戲模式與連線變數
@@ -141,6 +142,7 @@ class Leopard {
         this.hp = config.hp;
         this.maxHp = config.hp;
         this.atk = config.atk;
+        this.baseAtk = config.atk; // 🔥 記錄原始攻擊力，用於重置
         this.hasMoved = false; 
         this.isDying = false; 
         this.buffedThisTurn = false; // 用於防止同一回合重複獲得戰吼增益
@@ -198,13 +200,22 @@ class Leopard {
         if (Math.abs(this.vx) < MIN_SPEED) this.vx = 0;
         if (Math.abs(this.vy) < MIN_SPEED) this.vy = 0;
 
+        // 🔥 碰撞牆壁邏輯：疾風豹每次反彈增加攻擊力
+        let hitWall = false;
         if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
             this.vx = -this.vx * WALL_BOUNCE;
             this.x = this.x - this.radius < 0 ? this.radius : canvas.width - this.radius;
+            hitWall = true;
         }
         if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
             this.vy = -this.vy * WALL_BOUNCE;
             this.y = this.y - this.radius < 0 ? this.radius : canvas.height - this.radius;
+            hitWall = true;
+        }
+
+        if (hitWall && this.type === 'speedster') {
+            this.atk += 5;
+            damageTexts.push(new DamageText(this.x, this.y - 40, "加速! ATK+5", true));
         }
     }
 
