@@ -75,18 +75,24 @@ body {
     gap: 15px;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
     background: #4ecca3;
     color: #1a1a2e;
     box-shadow: 0 0 25px rgba(78, 204, 163, 0.5);
     transform: translateY(-3px);
 }
 
+.btn:disabled {
+    border-color: #444;
+    color: #444;
+    cursor: not-allowed;
+}
+
 .btn.online {
     border-color: #3498db;
 }
 
-.btn.online:hover {
+.btn.online:hover:not(:disabled) {
     background: #3498db;
     box-shadow: 0 0 25px rgba(52, 152, 219, 0.5);
 }
@@ -98,17 +104,90 @@ body {
 }
 
 /* =========================================
+   隊伍配置介面 (#selection-layer)
+   ========================================= */
+#selection-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0f3460;
+    z-index: 900;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+}
+
+.selection-content {
+    width: 90%;
+    max-width: 1000px;
+    text-align: center;
+}
+
+.type-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 30px 0;
+}
+
+.type-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid transparent;
+    border-radius: 15px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.type-card:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-5px);
+}
+
+.type-card.active {
+    border-color: #4ecca3;
+    box-shadow: 0 0 15px #4ecca3;
+}
+
+.type-icon {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
+
+.type-name {
+    font-size: 20px;
+    font-weight: bold;
+    display: block;
+}
+
+.type-stats {
+    font-size: 14px;
+    color: #ccc;
+    margin-top: 10px;
+}
+
+.preview-dots {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 15px 0;
+    min-height: 40px;
+}
+
+/* =========================================
    遊戲主要圖層 (#game-layer)
    ========================================= */
 #game-layer {
-    display: none; /* 初始隱藏，由 JS 的 startGame 切換 */
+    display: none; 
     flex-direction: column;
     align-items: center;
     padding-top: 10px;
     animation: fadeIn 1s ease;
 }
 
-/* 外部計分容器樣式 */
 #score-container {
     display: flex;
     align-items: center;
@@ -141,7 +220,6 @@ body {
 .dot.blue-fill { background-color: #3498db; box-shadow: 0 0 8px #3498db; }
 .dot.red-fill { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
 
-/* 遊戲畫布容器 */
 #game-container {
     position: relative;
     border: 4px solid #4ecca3;
@@ -150,7 +228,6 @@ body {
     touch-action: none;
 }
 
-/* 行動傷害文字樣式 */
 #action-damage-text {
     display: block;
     margin-top: 5px;
@@ -198,9 +275,6 @@ canvas {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* =========================================
-   動畫定義
-   ========================================= */
 @keyframes fadeInDown {
     from { opacity: 0; transform: translateY(-30px); }
     to { opacity: 1; transform: translateY(0); }
