@@ -930,7 +930,8 @@ function gameLoop() {
     if (isDragging && selectedLeopard) {
         let dx = selectedLeopard.x - dragEndPos.x; let dy = selectedLeopard.y - dragEndPos.y;
         const dist = Math.sqrt(dx**2 + dy**2);
-        if (dist > 5) {
+        // 🔥 同步視覺門檻：距離大於 15 才會顯示預覽線，否則視為取消狀態
+        if (dist > 15) {
             let limDx = dx, limDy = dy; if (dist > MAX_DRAG) { const r = MAX_DRAG / dist; limDx *= r; limDy *= r; }
             const pred = getPredictedCollision(selectedLeopard, limDx, limDy);
             if (pred.hit) {
