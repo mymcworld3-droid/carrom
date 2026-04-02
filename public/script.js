@@ -315,15 +315,15 @@ function resolveCollisions() {
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < b1.radius + b2.radius) {
-                // 🔥 特殊能力：戰吼 (Support)
+                // 🔥 戰吼邏輯：移除 buffedThisTurn 限制，允許複數次增加
                 if (b1.team === b2.team) {
                     if (activeStriker === b1 || activeStriker === b2) {
                         let striker = (activeStriker === b1) ? b1 : b2;
                         let target = (striker === b1) ? b2 : b1;
                         
-                        if (striker.type === 'support' && !target.buffedThisTurn) {
+                        if (striker.type === 'support') {
                             target.atk += 5;
-                            target.buffedThisTurn = true;
+                            // 每次碰撞都彈出文字
                             damageTexts.push(new DamageText(target.x, target.y - 40, "戰吼! ATK+5", true));
                         }
                     }
@@ -373,6 +373,7 @@ function resolveCollisions() {
     }
 }
 
+// 🔥 修改 script.js 中的 checkTurnSystem 函式
 function checkTurnSystem() {
     if (gameOver) return;
 
@@ -380,14 +381,13 @@ function checkTurnSystem() {
     
     if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
         isProcessing = false;
-        activeStriker = null; // 清空主動彈射者
+        activeStriker = null;
 
         leopards.forEach(l => { 
             l.buffedThisTurn = false;
             if (l.isDying) respawnLeopard(l); 
         });
 
-        // 判斷下一支可行動的隊伍
         const otherTeam = currentTurn === 'blue' ? 'red' : 'blue';
         const otherCanMove = leopards.some(l => l.team === otherTeam && !l.hasMoved);
 
@@ -396,7 +396,7 @@ function checkTurnSystem() {
         } else {
             const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
             if (!currentCanMove) {
-                // 🔥 雙方都彈完了，進入下一輪，交換先後手
+                // 進入下一輪並交換先後手
                 roundCount++;
                 firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
                 currentTurn = firstTeam;
@@ -404,7 +404,17 @@ function checkTurnSystem() {
             }
         }
         
-        // 🔥 自動跳過：若輪到的隊伍沒有可彈射的豹豹，自動跳過
+        // 🔥 跳出大字公告
+        const teamColor = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
+        const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
+        const statusText = currentTurn === firstTeam ? '先手' : '後手';
+        showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
+
+        // 🔥 單人模式：若輪到紅方，由 AI 執行
+        if (gameMode === 'single' && currentTurn === 'red') {
+            setTimeout(makeAIMove, 1500); // 等大字跑完再射
+        }
+
         const targetTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
         if (!targetTeamCanMove && !gameOver) {
             checkTurnSystem(); 
@@ -413,8 +423,6 @@ function checkTurnSystem() {
 
         actionDamageEl.style.opacity = '0';
         currentActionDamage = 0;
-        
-        // 🔥 更新文字顯示
         updateTurnDisplay();
     }
 }
@@ -682,6 +690,18 @@ function updateTurnDisplay() {
     
     // 更新畫面上方 turn-display 的文字
     turnDisplay.innerText = `第 ${roundCount} 輪 - 輪到 ${teamName} ${isFirst}`;
+}
+
+// 🔥 新增於 script.js
+function showBigAnnouncement(text, color = "white") {
+    const el = document.getElementById('announcement');
+    el.innerText = text;
+    el.style.color = color;
+    el.classList.add('show');
+    
+    setTimeout(() => {
+        el.classList.remove('show');
+    }, 1200); // 顯示 1.2 秒後消失
 }
 
 gameLoop();
