@@ -561,11 +561,19 @@ function checkTurnSystem() {
         const statusText = currentTurn === firstTeam ? '先手' : '後手';
         showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
 
-        // 4. 連線同步：由發動攻擊的那一方統一發送最終結算狀態
+        // 🔥 修改 syncState 的資料結構
         if (wasMyTurn) {
             socket.emit('syncState', {
                 roomId: currentRoomId, 
-                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
+                leopards: leopards.map(l => ({ 
+                    id: l.id, 
+                    x: l.x, 
+                    y: l.y, 
+                    hp: l.hp, 
+                    atk: l.atk,
+                    isDying: l.isDying, // 🔥 新增同步死亡狀態
+                    hasMoved: l.hasMoved // 🔥 新增同步行動標記
+                })),
                 blueKills,
                 redKills,
                 totalDamage: totalDamageDealt,
