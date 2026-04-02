@@ -556,8 +556,9 @@ function updateExternalUI() {
 function checkWinCondition() {
     if (blueKills >= 5 || redKills >= 5) {
         gameOver = true;
-        turnDisplay.innerText = blueKills >= 5 ? "藍隊獲勝！" : "紅隊獲勝！";
-        turnDisplay.style.color = "gold"; turnDisplay.style.fontSize = "32px";
+        
+        const winner = blueKills >= 5 ? 'blue' : 'red';
+        showFinalResult(winner);
     }
 }
 
@@ -648,6 +649,49 @@ function updateCameraAndSlowMo() {
     camera.y += (camera.targetY - camera.y) * 0.1;
 }
 
+function showFinalResult(winner) {
+    const layer = document.getElementById('result-layer');
+    const banner = document.getElementById('winner-banner');
+    
+    // 設定贏家色彩與文字
+    if (winner === 'blue') {
+        banner.innerText = "藍隊 壓倒性勝利";
+        banner.style.color = "#3498db";
+    } else {
+        banner.innerText = "紅隊 統治了戰場";
+        banner.style.color = "#e74c3c";
+    }
+
+    // 填入統計數據
+    document.getElementById('final-kills').innerText = winner === 'blue' ? blueKills : redKills;
+    document.getElementById('final-damage').innerText = Math.floor(totalDamageDealt);
+    document.getElementById('final-rounds').innerText = roundCount;
+
+    // 顯示圖層
+    layer.style.display = 'flex';
+    setTimeout(() => layer.classList.add('show'), 100);
+}
+
+function updateTurnDisplay() {
+    const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
+    const isFirst = currentTurn === firstTeam ? '(先手)' : '(後手)';
+    
+    // 更新畫面上方 turn-display 的文字
+    turnDisplay.innerText = `第 ${roundCount} 輪 - 輪到 ${teamName} ${isFirst}`;
+}
+
+// 🔥 新增於 script.js
+function showBigAnnouncement(text, color = "white") {
+    const el = document.getElementById('announcement');
+    el.innerText = text;
+    el.style.color = color;
+    el.classList.add('show');
+    
+    setTimeout(() => {
+        el.classList.remove('show');
+    }, 1200); // 顯示 1.2 秒後消失
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     updateCameraAndSlowMo();
@@ -684,26 +728,6 @@ function gameLoop() {
     checkTurnSystem();
     ctx.restore(); 
     requestAnimationFrame(gameLoop);
-}
-
-function updateTurnDisplay() {
-    const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
-    const isFirst = currentTurn === firstTeam ? '(先手)' : '(後手)';
-    
-    // 更新畫面上方 turn-display 的文字
-    turnDisplay.innerText = `第 ${roundCount} 輪 - 輪到 ${teamName} ${isFirst}`;
-}
-
-// 🔥 新增於 script.js
-function showBigAnnouncement(text, color = "white") {
-    const el = document.getElementById('announcement');
-    el.innerText = text;
-    el.style.color = color;
-    el.classList.add('show');
-    
-    setTimeout(() => {
-        el.classList.remove('show');
-    }, 1200); // 顯示 1.2 秒後消失
 }
 
 gameLoop();
