@@ -16,7 +16,7 @@ const io = new Server(server, {
 
 // 指定靜態檔案目錄（存放 index.html, style.css, script.js 的地方）
 app.use(express.static(path.join(__dirname, 'public')));
-
+// 🔥 核心邏輯：管理房間與即時同步
 let rooms = {}; 
 
 function broadcastRoomList(io) {
@@ -29,11 +29,9 @@ function broadcastRoomList(io) {
 }
 
 io.on('connection', (socket) => {
-    // 進入連線大廳時獲取清單
-    socket.on('getRooms', () => {
-        broadcastRoomList(io);
-    });
+    socket.on('getRooms', () => broadcastRoomList(io));
 
+    // 創建房間：自動將創建者設為藍隊並加入
     socket.on('createRoom', () => {
         const roomId = "room_" + socket.id;
         rooms[roomId] = {
@@ -45,17 +43,23 @@ io.on('connection', (socket) => {
         broadcastRoomList(io);
     });
 
+    // 加入房間：修復加入後的配置校準
     socket.on('joinRoom', (roomId) => {
         const room = rooms[roomId];
         if (room && room.players.length < 2) {
             room.players.push({ id: socket.id, team: 'red', ready: false, config: [] });
             socket.join(roomId);
+            
+            // 找出對手的配置
+            const opponent = room.players.find(p => p.id !== socket.id);
+            
             socket.emit('roomJoined', { 
                 roomId, 
                 team: 'red', 
-                opponentConfig: room.players[0].config 
+                opponentConfig: opponent ? opponent.config : [] 
             });
-            // 告知房主對手加入了，並把目前的配置傳給房主
+            
+            // 告知房主有對手加入
             socket.to(roomId).emit('opponentJoined', { team: 'red' });
             broadcastRoomList(io);
         } else {
@@ -63,14 +67,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🔥 新增：即時同步選擇狀態
+    // 即時更新選擇狀態
     socket.on('updateSelection', (data) => {
         const { roomId, config } = data;
         const room = rooms[roomId];
         if (room) {
             const player = room.players.find(p => p.id === socket.id);
             if (player) player.config = config;
-            // 廣播給房間內其他人
             socket.to(roomId).emit('opponentSelectionUpdate', { config });
         }
     });
@@ -97,11 +100,8 @@ io.on('connection', (socket) => {
             const index = rooms[id].players.findIndex(p => p.id === socket.id);
             if (index !== -1) {
                 rooms[id].players.splice(index, 1);
-                if (rooms[id].players.length === 0) {
-                    delete rooms[id];
-                } else {
-                    io.to(id).emit('opponentLeft');
-                }
+                if (rooms[id].players.length === 0) delete rooms[id];
+                else io.to(id).emit('opponentLeft');
             }
         }
         broadcastRoomList(io);
