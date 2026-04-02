@@ -274,7 +274,19 @@ function updateSelectionPreview() {
     btn.disabled = currentConfig.length < 3;
 }
 
+// 🔥 修改 script.js 中的 confirmSelection 函式
 function confirmSelection() {
+    let currentConfig = (myTeam === 'blue') ? blueTeamConfig : redTeamConfig;
+
+    if (gameMode === 'online') {
+        // 連線模式：發送給伺服器，按鈕禁用等待
+        document.getElementById('confirm-selection-btn').disabled = true;
+        document.getElementById('confirm-selection-btn').innerText = "等待對手中...";
+        socket.emit('confirmSelection', { team: myTeam, config: currentConfig });
+        return; 
+    }
+
+    // 原有的單機/區域模式邏輯
     if (gameMode === 'local' && selectingTeam === 'blue') {
         selectingTeam = 'red';
         document.getElementById('selection-title').innerText = '紅隊 配置隊伍';
@@ -282,7 +294,6 @@ function confirmSelection() {
         return;
     }
     
-    // 如果是單人模式，AI 隨機選
     if (gameMode === 'single') {
         const keys = Object.keys(LEOPARD_TYPES);
         redTeamConfig = [keys[Math.floor(Math.random()*keys.length)], keys[Math.floor(Math.random()*keys.length)], keys[Math.floor(Math.random()*keys.length)]];
