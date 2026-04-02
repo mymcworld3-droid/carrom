@@ -529,8 +529,30 @@ function initOnlineMode() {
     if (socket) return;
     socket = io();
 
+    socket.emit('getRooms');
+
+    socket.on('roomListUpdate', (rooms) => {
+        const container = document.getElementById('room-list-container');
+        if (rooms.length === 0) {
+            container.innerHTML = '<p style="color: #666; padding: 20px;">目前沒有房間，點擊下方按鈕創建一個！</p>';
+            return;
+        }
+        container.innerHTML = rooms.map(room => `
+            <div class="room-item">
+                <div class="room-info">
+                    <span class="room-name">${room.name}</span>
+                    <span class="room-players">目前人數: ${room.playerCount}/2</span>
+                </div>
+                <button class="join-btn" ${room.playerCount >= 2 ? 'disabled' : ''} onclick="joinRoom('${room.id}')">
+                    ${room.playerCount >= 2 ? '已滿' : '加入房間'}
+                </button>
+            </div>
+        `).join('');
+    });
+
     socket.on('roomCreated', (data) => handleEnterRoom(data));
     socket.on('roomJoined', (data) => handleEnterRoom(data));
+    
     socket.on('errorMsg', (msg) => alert(msg));
     
     socket.on('opponentReady', () => {
