@@ -428,6 +428,18 @@ function checkTurnSystem() {
             setTimeout(makeAIMove, 1500); // 等大字跑完再射
         }
 
+        if (gameMode === 'online' && activeStriker && activeStriker.team === myTeam) {
+            socket.emit('syncState', {
+                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
+                blueKills,
+                redKills,
+                totalDamage: totalDamageDealt,
+                round: roundCount,
+                firstTeam: firstTeam,
+                nextTurn: currentTurn
+            });
+        }
+
         const targetTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
         if (!targetTeamCanMove && !gameOver) {
             checkTurnSystem(); 
