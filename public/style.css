@@ -464,3 +464,48 @@ canvas {
     cursor: pointer;
     font-weight: bold;
 }
+
+/* 🔥 對戰室佈局 */
+.selection-flex-container {
+    display: flex;
+    gap: 20px;
+    margin: 20px 0;
+    align-items: flex-start;
+}
+
+.type-selection-area { flex: 2; }
+.status-board { 
+    flex: 1; 
+    background: rgba(0,0,0,0.4); 
+    padding: 20px; 
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.team-status-box {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.team-status-box h4 { margin: 0 0 10px 0; color: #888; }
+
+.btn-small {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid #444;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.btn-small:hover { background: #ff4444; }
+
+.preview-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+}
