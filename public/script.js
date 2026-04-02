@@ -626,6 +626,10 @@ function initOnlineMode() {
     });
 }
 
+function quitRoom() {
+    location.reload(); // 最快的方式是重整，確保狀態乾淨
+}
+
 function makeAIMove() {
     if (gameOver || isProcessing) return;
     const aiLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
