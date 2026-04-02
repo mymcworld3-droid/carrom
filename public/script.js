@@ -284,19 +284,6 @@ function selectType(key) {
     }
 }
 
-// 🔥 新增：重選功能 (適用於所有模式)
-function resetSelection() {
-    if (gameMode === 'online') {
-        if (myTeam === 'blue') blueTeamConfig = [];
-        else redTeamConfig = [];
-        socket.emit('updateSelection', { roomId: currentRoomId, config: [] });
-    } else {
-        if (selectingTeam === 'blue') blueTeamConfig = [];
-        else redTeamConfig = [];
-    }
-    renderMySelection();
-    document.getElementById('confirm-selection-btn').disabled = true;
-}
 
 function renderMySelection() {
     let team = (gameMode === 'online') ? myTeam : selectingTeam;
