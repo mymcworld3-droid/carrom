@@ -573,17 +573,17 @@ function joinRoom() {
     if (id) socket.emit('joinRoom', id);
 }
 
-// 🔥 更新 initOnlineMode：監聽對手的實時選擇
 function initOnlineMode() {
     if (socket) return;
     socket = io();
     socket.emit('getRooms');
 
+    // 對手即時選擇同步
     socket.on('opponentSelectionUpdate', (data) => {
         const preview = document.getElementById('opponent-selection-preview');
         const oppTeam = (myTeam === 'blue') ? 'red' : 'blue';
         preview.innerHTML = data.config.map(key => `
-            <div class="dot ${oppTeam}-fill" style="width:35px; height:35px; display:flex; align-items:center; justify-content:center; font-size:16px; opacity: 0.8;">
+            <div class="dot ${oppTeam}-fill" style="width:35px; height:35px; display:flex; align-items:center; justify-content:center; font-size:16px;">
                 ${LEOPARD_TYPES[key].icon}
             </div>
         `).join('');
@@ -591,10 +591,16 @@ function initOnlineMode() {
 
     socket.on('roomJoined', (data) => {
         handleEnterRoom(data);
-        // 如果對方已經選了，顯示出來
+        document.getElementById('opponent-status-hint').innerText = "對手已加入";
+        // 如果對方已經選了，立刻同步過來
         if (data.opponentConfig) {
             socket.emit('opponentSelectionUpdate', { config: data.opponentConfig });
         }
+    });
+
+    socket.on('opponentJoined', () => {
+        document.getElementById('opponent-status-hint').innerText = "對手已加入";
+        showBigAnnouncement("對手已加入", "#3498db");
     });
 
     socket.on('opponentLeft', () => {
