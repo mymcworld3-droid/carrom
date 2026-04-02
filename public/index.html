@@ -61,6 +61,34 @@
             <div id="announcement" class="big-text-overlay"></div> 
         </div>
     </div>
+    <div id="result-layer" style="display: none;">
+        <div class="result-card">
+            <div id="winner-banner" class="winner-banner">BLUE VICTORY</div>        
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">總擊殺</span>
+                    <span id="final-kills" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">總造成傷害</span>
+                    <span id="final-damage" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">戰鬥輪數</span>
+                    <span id="final-rounds" class="stat-value">0</span>
+                </div>
+            </div>
+
+            <div class="result-buttons">
+                <button class="btn restart" onclick="location.reload()">
+                    <span class="btn-icon">🔄</span> 再戰一場
+                </button>
+                <button class="btn menu" onclick="location.reload()">
+                    <span class="btn-icon">🏠</span> 回到選單
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
