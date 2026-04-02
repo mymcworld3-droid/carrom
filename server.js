@@ -104,7 +104,34 @@ io.on('connection', (socket) => {
     // 🔥 監聽回合結束後的狀態同步，並更新給對手
     socket.on('syncState', (data) => {
         // data 包含所有的豹豹位置、血量以及目前的擊殺數、輪數等
-        socket.to(data.roomId).emit('updateClientState', data);
+    // 🔥 在 initOnlineMode 函式中修改此監聽器
+    socket.on('updateClientState', (data) => {
+        data.leopards.forEach(remoteL => {
+            const localL = leopards.find(l => l.id === remoteL.id);
+            if (localL) {
+                localL.x = remoteL.x; 
+                localL.y = remoteL.y;
+                localL.hp = remoteL.hp; 
+                localL.atk = remoteL.atk;
+                // 強制歸零速度，防止兩邊物理模擬差異導致卡住
+                localL.vx = 0;
+                localL.vy = 0;
+            }
+        });
+    
+        // 強制重置狀態鎖
+        isProcessing = false;
+        activeStriker = null;
+    
+        blueKills = data.blueKills; 
+        redKills = data.redKills;
+        totalDamageDealt = data.totalDamage; 
+        roundCount = data.round;
+        firstTeam = data.firstTeam; 
+        currentTurn = data.nextTurn;
+    
+        updateExternalUI(); 
+        updateTurnDisplay();
     });
 
     socket.on('disconnect', () => {
