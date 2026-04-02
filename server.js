@@ -20,21 +20,36 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 🔥 修改 server.js 中的 io.on('connection') 部分
 let players = {}; // 追蹤連線玩家狀態
 
-// 🔥 修改 server.js：管理多房間邏輯
+// 🔥 修改 server.js：管理房間列表與廣播
 let rooms = {}; 
+
+function broadcastRoomList() {
+    const list = Object.keys(rooms).map(id => ({
+        id: id,
+        name: rooms[id].name,
+        playerCount: rooms[id].players.length
+    }));
+    io.emit('roomListUpdate', list); // 廣播給所有人
+}
 
 io.on('connection', (socket) => {
     console.log('玩家連線:', socket.id);
 
+    // 進入連線模式時獲取初始列表
+    socket.on('getRooms', () => {
+        broadcastRoomList();
+    });
+
     // 1. 創建房間
     socket.on('createRoom', () => {
-        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        const roomId = "room_" + socket.id; // 用 socket ID 作為唯一標識
         rooms[roomId] = {
+            name: `豹豹戰隊 ${Math.floor(Math.random()*999)}`,
             players: [{ id: socket.id, team: 'blue', ready: false, config: null }],
-            status: 'waiting'
         };
         socket.join(roomId);
         socket.emit('roomCreated', { roomId, team: 'blue' });
+        broadcastRoomList(); // 更新清單
     });
 
     // 2. 加入房間
@@ -44,8 +59,8 @@ io.on('connection', (socket) => {
             room.players.push({ id: socket.id, team: 'red', ready: false, config: null });
             socket.join(roomId);
             socket.emit('roomJoined', { roomId, team: 'red' });
-            // 告訴房主有人進來了
             io.to(roomId).emit('opponentJoined');
+            broadcastRoomList(); // 更新清單
         } else {
             socket.emit('errorMsg', room ? '房間已滿' : '房間不存在');
         }
@@ -53,7 +68,7 @@ io.on('connection', (socket) => {
 
     // 3. 確認配置
     socket.on('confirmSelection', (data) => {
-        const { roomId, config, team } = data;
+        const { roomId, config } = data;
         const room = rooms[roomId];
         if (!room) return;
 
@@ -61,39 +76,30 @@ io.on('connection', (socket) => {
         if (player) {
             player.config = config;
             player.ready = true;
-            
-            // 通知同房間的對手
             socket.to(roomId).emit('opponentReady');
-
-            // 檢查是否雙方皆準備完成
             if (room.players.length === 2 && room.players.every(p => p.ready)) {
                 const blue = room.players.find(p => p.team === 'blue');
                 const red = room.players.find(p => p.team === 'red');
-                io.to(roomId).emit('allPlayersReady', {
-                    blueConfig: blue.config,
-                    redConfig: red.config
-                });
+                io.to(roomId).emit('allPlayersReady', { blueConfig: blue.config, redConfig: red.config });
             }
         }
     });
 
-    // 4. 轉發遊戲動作
+    // 4. 遊戲同步 (確保轉發到正確房間)
     socket.on('playerMove', (data) => {
-        const { roomId } = data;
-        socket.to(roomId).emit('opponentMove', data);
+        socket.to(data.roomId).emit('opponentMove', data);
     });
 
     socket.on('syncState', (data) => {
-        const { roomId } = data;
-        socket.to(roomId).emit('updateClientState', data);
+        socket.to(data.roomId).emit('updateClientState', data);
     });
 
     socket.on('disconnect', () => {
-        // 清理房間
         for (const id in rooms) {
             rooms[id].players = rooms[id].players.filter(p => p.id !== socket.id);
             if (rooms[id].players.length === 0) delete rooms[id];
         }
+        broadcastRoomList();
     });
 });
 
