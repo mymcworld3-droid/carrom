@@ -785,7 +785,6 @@ function initOnlineMode() {
         }
     });
 
-    // 🔥 修改 updateClientState 監聽器
     socket.on('updateClientState', (data) => {
         data.leopards.forEach(remoteL => {
             const localL = leopards.find(l => l.id === remoteL.id);
@@ -794,17 +793,24 @@ function initOnlineMode() {
                 localL.y = remoteL.y;
                 localL.hp = remoteL.hp; 
                 localL.atk = remoteL.atk;
-                localL.vx = 0;
+                localL.vx = 0; // 強制歸零速度
                 localL.vy = 0;
-                // 🔥 強制同步狀態，確保 Client 能正常重置
                 localL.isDying = remoteL.isDying;
                 localL.hasMoved = remoteL.hasMoved;
             }
         });
     
-        // 強制重置狀態鎖
-        isProcessing = false;
-        activeStriker = null;
+        // 🔥 關鍵修正：強制重置所有流程旗標，確保 UI 解鎖
+        isProcessing = false;   // 解除「處理中」狀態
+        activeStriker = null;  // 清空發動者
+        isSlowMo = false;      // 強制關閉慢動作
+        slowMoTimer = 0;       // 重置計時器
+        targetTimeScale = 1.0; // 回復正常時間流速
+        timeScale = 1.0;
+        
+        // 重置畫面中央的傷害文字 UI
+        actionDamageEl.style.opacity = '0';
+        currentActionDamage = 0;
     
         blueKills = data.blueKills; 
         redKills = data.redKills;
