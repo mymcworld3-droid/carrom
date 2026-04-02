@@ -733,8 +733,14 @@ function handleEnd(e) {
         const vx = dx * LAUNCH_FORCE_MULT;
         const vy = dy * LAUNCH_FORCE_MULT;
 
+        // 🔥 尋找 handleEnd 函式內的 socket.emit 部分
         if (gameMode === 'online') {
-            socket.emit('playerMove', { id: selectedLeopard.id, vx, vy });
+            socket.emit('playerMove', { 
+                roomId: currentRoomId, // 🔥 必須夾帶 roomId
+                id: selectedLeopard.id, 
+                vx, 
+                vy 
+            });
         }
 
         // 🔥 記錄主動彈射者
