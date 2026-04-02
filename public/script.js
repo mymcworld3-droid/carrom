@@ -228,11 +228,16 @@ class Leopard {
     }
 }
 
-// 🔥 配置階段邏輯
+// 🔥 修改 script.js 中的 enterSelection 函式
 window.enterSelection = function(mode) {
     gameMode = mode;
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('selection-layer').style.display = 'flex';
+    
+    // 🔥 如果是連線模式，立刻建立 Socket 連線
+    if (mode === 'online') {
+        initOnlineMode();
+    }
     
     renderTypeSelection();
 };
