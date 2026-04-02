@@ -573,6 +573,24 @@ function joinRoom() {
     if (id) socket.emit('joinRoom', id);
 }
 
+// 🔥 核心邏輯：統一處理進入房間後的 UI 切換
+function handleEnterRoom(data) {
+    currentRoomId = data.roomId;
+    myTeam = data.team;
+    
+    // 隱藏房間列表，顯示豹豹選擇區
+    document.getElementById('room-section').style.display = 'none';
+    document.getElementById('leopard-selection-section').style.display = 'block';
+    
+    // 更新標題隊伍顏色
+    const titleEl = document.getElementById('selection-title');
+    titleEl.innerText = (myTeam === 'blue') ? '藍隊 配置隊伍' : '紅隊 配置隊伍';
+    titleEl.style.color = (myTeam === 'blue') ? '#3498db' : '#e74c3c';
+    
+    renderTypeSelection();
+    renderSelectionUI();
+}
+
 function initOnlineMode() {
     if (socket) return;
     socket = io();
