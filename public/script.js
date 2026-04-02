@@ -499,39 +499,41 @@ function respawnLeopard(leopard) {
 
 // --- 以下維持原有物理模擬與渲染邏輯 ---
 
-// 🔥 修改 script.js 中的 initOnlineMode 函式
+// 🔥 1. 修改 initOnlineMode 中的 initTeam 與 allPlayersReady 事件
 function initOnlineMode() {
     if (typeof io === 'undefined') {
         alert("找不到 Socket.io，請確認伺服器運作中");
         return;
     }
-    if (socket) return; // 防止重複初始化
+    if (socket) return; 
 
     socket = io();
 
     socket.on('initTeam', (assignedTeam) => {
         myTeam = assignedTeam;
+        selectingTeam = assignedTeam; // 🔥 確保選人時是修改自己隊伍的 Config
         const colorName = myTeam === 'blue' ? '藍隊' : '紅隊';
         document.getElementById('selection-title').innerText = `你是 ${colorName} - 請配置隊伍`;
         console.log(`分配隊伍: ${myTeam}`);
     });
 
-    // 接收對手配置
     socket.on('opponentReady', (data) => {
-        if (data.team === 'blue') blueTeamConfig = data.config;
-        else redTeamConfig = data.config;
-        console.log('對手配置已同步');
+        // 可以在 UI 上顯示「對方已就緒」的提示
+        console.log('對手已完成配置，等待你確認');
     });
 
-    // 雙方準備就緒，進入遊戲
-    socket.on('allPlayersReady', () => {
+    socket.on('allPlayersReady', (data) => {
+        // 🔥 接收伺服器彙整後的完整配置
+        blueTeamConfig = data.blueConfig;
+        redTeamConfig = data.redConfig;
+        
         showBigAnnouncement("雙方就緒！戰鬥開始", "gold");
+        
         setTimeout(() => {
-            // 切換 UI
             document.getElementById('selection-layer').style.display = 'none';
             document.getElementById('game-layer').style.display = 'flex';
             
-            initGame(); // 產生豹豹
+            initGame(); // 此時 Configs 已完整，豹豹會正常顯示
             updateExternalUI();
             updateTurnDisplay();
         }, 1500);
