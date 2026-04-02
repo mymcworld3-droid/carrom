@@ -548,3 +548,120 @@ canvas {
 }
 
 .btn-quit:hover { background: #ff4444; color: white; }
+
+/* 🔥 修改 body：確保在手機上不會有滾動條且居中 */
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #1a1a2e;
+    font-family: "Microsoft JhengHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* 改為置中 */
+    align-items: center;
+    height: 100vh;
+    height: 100dvh; /* 支援行動裝置動態高度 */
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* 🔥 修改選單標題：在小螢幕縮小字體 */
+.glow-title {
+    font-size: clamp(32px, 10vw, 64px); /* 根據螢幕寬度自動縮放 */
+    color: #4ecca3;
+    margin: 0;
+    text-shadow: 0 0 20px rgba(78, 204, 163, 0.6), 0 0 40px rgba(78, 204, 163, 0.3);
+    letter-spacing: 2px;
+}
+
+/* 🔥 修改按鈕：確保不會超出螢幕寬度 */
+.btn {
+    width: 80vw;
+    max-width: 280px;
+    padding: 12px 20px;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    border: 2px solid #4ecca3;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* 🔥 修改遊戲容器與計分板：寬度設為 100% */
+#score-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 95vw;
+    max-width: 800px;
+    margin-bottom: 5px;
+}
+
+#game-title {
+    color: white;
+    font-size: clamp(14px, 4vw, 24px);
+    font-weight: bold;
+}
+
+#game-container {
+    position: relative;
+    border: 2px solid #4ecca3;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
+    touch-action: none;
+    max-width: 98vw; /* 確保不超出螢幕 */
+    max-height: 80vh;
+}
+
+canvas {
+    background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
+    display: block;
+    width: 100% !important;  /* 強制寬度 100% */
+    height: auto !important; /* 高度自動維持比例 */
+    touch-action: none; 
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 🔥 修改結算卡片：確保在小手機上能顯示完整 */
+.result-card {
+    background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    transform: translateY(30px);
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    width: 85vw;
+    max-width: 400px;
+}
+
+.winner-banner {
+    font-size: clamp(24px, 8vw, 48px);
+    margin-bottom: 20px;
+}
+
+/* 🔥 針對直向螢幕(手機)的微調 */
+@media (max-width: 600px) {
+    .lobby-layout {
+        flex-direction: column;
+        align-items: center;
+    }
+    .selection-box, .status-panel {
+        width: 100%;
+    }
+    .type-container {
+        grid-template-columns: repeat(2, 1fr); /* 手機上變兩排 */
+        gap: 10px;
+    }
+    .big-text-overlay {
+        font-size: 40px;
+    }
+}
