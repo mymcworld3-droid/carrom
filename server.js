@@ -20,7 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 🔥 修改 server.js 中的 io.on('connection') 部分
 let players = {}; // 追蹤連線玩家狀態
 
-// 🔥 修改 server.js：管理房間列表與廣播
+// 🔥 將 server.js 的 io.on('connection', ...) 區塊完整替換為以下邏輯
 let rooms = {}; 
 
 function broadcastRoomList() {
@@ -29,30 +29,28 @@ function broadcastRoomList() {
         name: rooms[id].name,
         playerCount: rooms[id].players.length
     }));
-    io.emit('roomListUpdate', list); // 廣播給所有人
+    io.emit('roomListUpdate', list);
 }
 
 io.on('connection', (socket) => {
     console.log('玩家連線:', socket.id);
 
-    // 進入連線模式時獲取初始列表
     socket.on('getRooms', () => {
         broadcastRoomList();
     });
 
-    // 1. 創建房間
     socket.on('createRoom', () => {
-        const roomId = "room_" + socket.id; // 用 socket ID 作為唯一標識
+        const roomId = "room_" + socket.id;
         rooms[roomId] = {
-            name: `豹豹戰隊 ${Math.floor(Math.random()*999)}`,
+            name: `豹豹戰隊 ${Math.floor(100 + Math.random() * 899)}`,
             players: [{ id: socket.id, team: 'blue', ready: false, config: null }],
+            status: 'waiting'
         };
         socket.join(roomId);
         socket.emit('roomCreated', { roomId, team: 'blue' });
-        broadcastRoomList(); // 更新清單
+        broadcastRoomList();
     });
 
-    // 2. 加入房間
     socket.on('joinRoom', (roomId) => {
         const room = rooms[roomId];
         if (room && room.players.length < 2) {
@@ -60,13 +58,12 @@ io.on('connection', (socket) => {
             socket.join(roomId);
             socket.emit('roomJoined', { roomId, team: 'red' });
             io.to(roomId).emit('opponentJoined');
-            broadcastRoomList(); // 更新清單
+            broadcastRoomList();
         } else {
             socket.emit('errorMsg', room ? '房間已滿' : '房間不存在');
         }
     });
 
-    // 3. 確認配置
     socket.on('confirmSelection', (data) => {
         const { roomId, config } = data;
         const room = rooms[roomId];
@@ -77,6 +74,7 @@ io.on('connection', (socket) => {
             player.config = config;
             player.ready = true;
             socket.to(roomId).emit('opponentReady');
+            
             if (room.players.length === 2 && room.players.every(p => p.ready)) {
                 const blue = room.players.find(p => p.team === 'blue');
                 const red = room.players.find(p => p.team === 'red');
@@ -85,19 +83,22 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 4. 遊戲同步 (確保轉發到正確房間)
     socket.on('playerMove', (data) => {
-        socket.to(data.roomId).emit('opponentMove', data);
+        if (data.roomId) socket.to(data.roomId).emit('opponentMove', data);
     });
 
     socket.on('syncState', (data) => {
-        socket.to(data.roomId).emit('updateClientState', data);
+        if (data.roomId) socket.to(data.roomId).emit('updateClientState', data);
     });
 
     socket.on('disconnect', () => {
         for (const id in rooms) {
             rooms[id].players = rooms[id].players.filter(p => p.id !== socket.id);
-            if (rooms[id].players.length === 0) delete rooms[id];
+            if (rooms[id].players.length === 0) {
+                delete rooms[id];
+            } else {
+                io.to(id).emit('opponentLeft');
+            }
         }
         broadcastRoomList();
     });
