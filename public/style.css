@@ -415,3 +415,52 @@ canvas {
 }
 
 .join-btn:disabled { background: #444; cursor: not-allowed; }
+
+
+/* 🔥 新增於 style.css 底部 */
+#room-list-container {
+    max-height: 350px;
+    overflow-y: auto;
+    margin: 20px 0;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(78, 204, 163, 0.2);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.room-info {
+    text-align: left;
+}
+
+.room-name {
+    font-weight: bold;
+    color: #4ecca3;
+    display: block;
+    font-size: 18px;
+}
+
+.room-players {
+    font-size: 13px;
+    color: #888;
+}
+
+.join-btn {
+    background: #3498db;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
