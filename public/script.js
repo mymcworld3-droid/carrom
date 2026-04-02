@@ -479,6 +479,7 @@ function resolveCollisions() {
     }
 }
 
+// 🔥 修復後的回合管理系統：將疾風豹的重置時機延後至整輪(Round)結束
 function checkTurnSystem() {
     if (gameOver) return;
 
@@ -492,13 +493,10 @@ function checkTurnSystem() {
         
         isProcessing = false;
 
-        // 1. 處理重生與狀態重置
+        // 1. 處理重生與增益清理
         leopards.forEach(l => { 
             l.buffedThisTurn = false;
-            // 🔥 疾風豹回合結束重置攻擊力
-            if (l.type === 'speedster') {
-                l.atk = l.baseAtk;
-            }
+            // 🔥 這裡移除了原本每回合重置疾風豹的邏輯，改至下方的 Round 結算處
             if (l.isDying) respawnLeopard(l); 
         });
 
@@ -514,8 +512,16 @@ function checkTurnSystem() {
             } else {
                 const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
                 if (!currentCanMove) {
-                    // 兩邊都沒動作了，重置輪數
+                    // 兩邊都沒動作了，重置輪數（一整回合結束）
                     roundCount++;
+                    
+                    // 🔥 疾風豹能力重置：只有在一整輪(Round)結束後才重置攻擊力
+                    leopards.forEach(l => {
+                        if (l.type === 'speedster') {
+                            l.atk = l.baseAtk;
+                        }
+                    });
+
                     firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
                     currentTurn = firstTeam;
                     leopards.forEach(l => l.hasMoved = false);
@@ -533,7 +539,7 @@ function checkTurnSystem() {
         const statusText = currentTurn === firstTeam ? '先手' : '後手';
         showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
 
-        // 4. 連線同步
+        // 4. 連線同步：由發動攻擊的那一方統一發送最終結算狀態
         if (wasMyTurn) {
             socket.emit('syncState', {
                 roomId: currentRoomId, 
@@ -547,7 +553,7 @@ function checkTurnSystem() {
             });
         }
 
-        activeStriker = null; 
+        activeStriker = null; // 同步發送後才清理
 
         if (gameMode === 'single' && currentTurn === 'red') {
             setTimeout(makeAIMove, 1500);
