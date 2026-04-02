@@ -261,12 +261,28 @@ function renderTypeSelection() {
     }
 }
 
+// 🔥 修改 selectType 函式，確保 myTeam 影響選人
 function selectType(key) {
-    let currentConfig = (selectingTeam === 'blue') ? blueTeamConfig : redTeamConfig;
+    // 如果是連線模式，強制選擇自己隊伍的配置
+    let teamToUpdate = (gameMode === 'online') ? myTeam : selectingTeam;
+    let currentConfig = (teamToUpdate === 'blue') ? blueTeamConfig : redTeamConfig;
+    
     if (currentConfig.length < 3) {
         currentConfig.push(key);
-        updateSelectionPreview();
+        // 🔥 更新預覽時也使用對應的隊伍
+        updateSelectionPreviewForOnline(teamToUpdate);
     }
+}
+
+// 🔥 為了連線模式微調的預覽函式
+function updateSelectionPreviewForOnline(targetTeam) {
+    const preview = document.getElementById('current-selection');
+    const btn = document.getElementById('confirm-selection-btn');
+    let currentConfig = (targetTeam === 'blue') ? blueTeamConfig : redTeamConfig;
+    
+    preview.innerHTML = currentConfig.map(key => `<div class="dot ${targetTeam}-fill" style="width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:14px;">${LEOPARD_TYPES[key].icon}</div>`).join('');
+    
+    btn.disabled = currentConfig.length < 3;
 }
 
 function updateSelectionPreview() {
