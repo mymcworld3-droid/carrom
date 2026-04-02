@@ -768,7 +768,7 @@ function initOnlineMode() {
         }
     });
 
-    // 🔥 在 initOnlineMode 函式中修改此監聽器
+    // 🔥 修改 updateClientState 監聽器
     socket.on('updateClientState', (data) => {
         data.leopards.forEach(remoteL => {
             const localL = leopards.find(l => l.id === remoteL.id);
@@ -777,9 +777,11 @@ function initOnlineMode() {
                 localL.y = remoteL.y;
                 localL.hp = remoteL.hp; 
                 localL.atk = remoteL.atk;
-                // 強制歸零速度，防止兩邊物理模擬差異導致卡住
                 localL.vx = 0;
                 localL.vy = 0;
+                // 🔥 強制同步狀態，確保 Client 能正常重置
+                localL.isDying = remoteL.isDying;
+                localL.hasMoved = remoteL.hasMoved;
             }
         });
     
