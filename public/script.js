@@ -470,20 +470,61 @@ function respawnLeopard(leopard) {
 
 // --- 以下維持原有物理模擬與渲染邏輯 ---
 
+// 🔥 修改 script.js 中的 initOnlineMode 函式
 function initOnlineMode() {
     if (typeof io === 'undefined') return;
     socket = io();
-    socket.on('initTeam', (assignedTeam) => { myTeam = assignedTeam; });
+
+    socket.on('initTeam', (assignedTeam) => {
+        myTeam = assignedTeam;
+        const colorName = myTeam === 'blue' ? '藍隊' : '紅隊';
+        document.getElementById('selection-title').innerText = `你是 ${colorName} - 請配置隊伍`;
+    });
+
+    // 接收對手選好的豹種
+    socket.on('opponentReady', (data) => {
+        if (data.team === 'blue') blueTeamConfig = data.config;
+        else redTeamConfig = data.config;
+        console.log('對手已準備完成');
+    });
+
+    // 雙方都選好，正式進入遊戲
+    socket.on('allPlayersReady', () => {
+        showBigAnnouncement("雙方準備就緒！", "gold");
+        setTimeout(startGame, 1000);
+    });
+
     socket.on('opponentMove', (data) => {
         const leopard = leopards.find(l => l.id === data.id);
-        if (leopard) { leopard.vx = data.vx; leopard.vy = data.vy; leopard.hasMoved = true; isProcessing = true; }
+        if (leopard) {
+            activeStriker = leopard; // 記錄對手彈射的那隻
+            leopard.vx = data.vx;
+            leopard.vy = data.vy;
+            leopard.hasMoved = true;
+            isProcessing = true;
+        }
     });
-    socket.on('syncState', (data) => {
+
+    // 強制座標校準（防止物理模擬分歧）
+    socket.on('updateClientState', (data) => {
         data.leopards.forEach(remoteL => {
             const localL = leopards.find(l => l.id === remoteL.id);
-            if (localL) { localL.x = remoteL.x; localL.y = remoteL.y; localL.hp = remoteL.hp; localL.atk = remoteL.atk; }
+            if (localL) {
+                localL.x = remoteL.x;
+                localL.y = remoteL.y;
+                localL.hp = remoteL.hp;
+                localL.atk = remoteL.atk;
+            }
         });
-        blueKills = data.blueKills; redKills = data.redKills; updateExternalUI();
+        blueKills = data.blueKills;
+        redKills = data.redKills;
+        totalDamageDealt = data.totalDamage;
+        roundCount = data.round;
+        firstTeam = data.firstTeam;
+        currentTurn = data.nextTurn;
+        
+        updateExternalUI();
+        updateTurnDisplay();
     });
 }
 
