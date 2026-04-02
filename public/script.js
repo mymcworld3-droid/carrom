@@ -53,6 +53,11 @@ let dragEndPos = { x: 0, y: 0 };
 let isProcessing = false; 
 let gameOver = false;
 
+// 🔥 新增變數：追蹤輪數、先後手與目前的彈射者
+let roundCount = 1;         // 目前總輪數
+let firstTeam = 'blue';    // 本輪的先手隊伍
+let activeStriker = null;  // 目前正在移動的主動彈射豹豹
+
 const blueSpawns = [{x: 100, y: 150}, {x: 100, y: 300}, {x: 100, y: 450}];
 const redSpawns = [{x: 700, y: 150}, {x: 700, y: 300}, {x: 700, y: 450}];
 
@@ -312,13 +317,14 @@ function resolveCollisions() {
             if (distance < b1.radius + b2.radius) {
                 // 🔥 特殊能力：戰吼 (Support)
                 if (b1.team === b2.team) {
-                    let active = (b1 === selectedLeopard || Math.abs(b1.vx) > 1) ? b1 : (b2 === selectedLeopard || Math.abs(b2.vx) > 1 ? b2 : null);
-                    if (active) {
-                        let other = (active === b1) ? b2 : b1;
-                        if (active.type === 'support' && !other.buffedThisTurn) {
-                            other.atk += 5;
-                            other.buffedThisTurn = true;
-                            damageTexts.push(new DamageText(other.x, other.y - 40, "ATK +5!", true));
+                    if (activeStriker === b1 || activeStriker === b2) {
+                        let striker = (activeStriker === b1) ? b1 : b2;
+                        let target = (striker === b1) ? b2 : b1;
+                        
+                        if (striker.type === 'support' && !target.buffedThisTurn) {
+                            target.atk += 5;
+                            target.buffedThisTurn = true;
+                            damageTexts.push(new DamageText(target.x, target.y - 40, "戰吼! ATK+5", true));
                         }
                     }
                 } else {
@@ -370,45 +376,46 @@ function resolveCollisions() {
 function checkTurnSystem() {
     if (gameOver) return;
 
-    const activeLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
+    const movingLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
-    if (isProcessing && activeLeopards.length === 0 && !isSlowMo) {
+    if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
         isProcessing = false;
-        
-        // 🔥 回合結束，重置戰吼標記
+        activeStriker = null; // 清空主動彈射者
+
         leopards.forEach(l => { 
             l.buffedThisTurn = false;
             if (l.isDying) respawnLeopard(l); 
         });
 
-        const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
-        const nextTeamCanMove = leopards.some(l => l.team === nextTeam && !l.hasMoved);
+        // 判斷下一支可行動的隊伍
+        const otherTeam = currentTurn === 'blue' ? 'red' : 'blue';
+        const otherCanMove = leopards.some(l => l.team === otherTeam && !l.hasMoved);
 
-        if (nextTeamCanMove) {
-            currentTurn = nextTeam;
-            if (gameMode === 'single' && currentTurn === 'red') {
-                setTimeout(makeAIMove, 800);
-            }
+        if (otherCanMove) {
+            currentTurn = otherTeam;
         } else {
-            const currentTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
-            if (!currentTeamCanMove) {
+            const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
+            if (!currentCanMove) {
+                // 🔥 雙方都彈完了，進入下一輪，交換先後手
+                roundCount++;
+                firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
+                currentTurn = firstTeam;
                 leopards.forEach(l => l.hasMoved = false);
-                currentTurn = 'blue';
             }
         }
         
-        actionDamageEl.style.opacity = '0';
-        currentActionDamage = 0;
-
-        if (gameMode === 'online' && myTeam === 'blue') {
-            socket.emit('syncRequest', {
-                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
-                blueKills,
-                redKills
-            });
+        // 🔥 自動跳過：若輪到的隊伍沒有可彈射的豹豹，自動跳過
+        const targetTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
+        if (!targetTeamCanMove && !gameOver) {
+            checkTurnSystem(); 
+            return;
         }
 
-        turnDisplay.innerText = `輪到${currentTurn === 'blue' ? '藍隊' : '紅隊'}彈射`;
+        actionDamageEl.style.opacity = '0';
+        currentActionDamage = 0;
+        
+        // 🔥 更新文字顯示
+        updateTurnDisplay();
     }
 }
 
@@ -449,7 +456,6 @@ function respawnLeopard(leopard) {
     leopard.vy = 0;
     leopard.hp = leopard.maxHp;
     leopard.isDying = false;
-    leopard.hasMoved = false;
 }
 
 // --- 以下維持原有物理模擬與渲染邏輯 ---
@@ -585,15 +591,33 @@ function handleMove(e) {
 
 function handleEnd(e) {
     if (!isDragging) return;
-    let dx = selectedLeopard.x - dragEndPos.x; let dy = selectedLeopard.y - dragEndPos.y;
+    let dx = selectedLeopard.x - dragEndPos.x;
+    let dy = selectedLeopard.y - dragEndPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    
     if (dist > 5) {
-        if (dist > MAX_DRAG) { const ratio = MAX_DRAG / dist; dx *= ratio; dy *= ratio; }
-        const vx = dx * LAUNCH_FORCE_MULT; const vy = dy * LAUNCH_FORCE_MULT;
-        if (gameMode === 'online') { socket.emit('playerMove', { id: selectedLeopard.id, vx, vy }); }
-        selectedLeopard.vx = vx; selectedLeopard.vy = vy; selectedLeopard.hasMoved = true; isProcessing = true;
+        if (dist > MAX_DRAG) {
+            const ratio = MAX_DRAG / dist;
+            dx *= ratio; dy *= ratio;
+        }
+
+        const vx = dx * LAUNCH_FORCE_MULT;
+        const vy = dy * LAUNCH_FORCE_MULT;
+
+        if (gameMode === 'online') {
+            socket.emit('playerMove', { id: selectedLeopard.id, vx, vy });
+        }
+
+        // 🔥 記錄主動彈射者
+        activeStriker = selectedLeopard; 
+        selectedLeopard.vx = vx;
+        selectedLeopard.vy = vy;
+        selectedLeopard.hasMoved = true;
+        isProcessing = true;
     }
-    isDragging = false; selectedLeopard = null;
+
+    isDragging = false;
+    selectedLeopard = null;
 }
 
 canvas.addEventListener('mousedown', handleStart);
@@ -650,6 +674,14 @@ function gameLoop() {
     checkTurnSystem();
     ctx.restore(); 
     requestAnimationFrame(gameLoop);
+}
+
+function updateTurnDisplay() {
+    const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
+    const isFirst = currentTurn === firstTeam ? '(先手)' : '(後手)';
+    
+    // 更新畫面上方 turn-display 的文字
+    turnDisplay.innerText = `第 ${roundCount} 輪 - 輪到 ${teamName} ${isFirst}`;
 }
 
 gameLoop();
