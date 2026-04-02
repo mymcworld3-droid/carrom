@@ -1,3 +1,6 @@
+/* =========================================
+   1. 基礎設定與動畫 (Base & Animations)
+   ========================================= */
 body {
     margin: 0;
     padding: 0;
@@ -5,63 +8,46 @@ body {
     font-family: "Microsoft JhengHei", sans-serif;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
-    padding-top: 10px; 
+    justify-content: center;
     align-items: center;
     height: 100vh;
+    height: 100dvh; /* 支援行動裝置動態高度 */
     overflow: hidden;
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
 }
 
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes glowText {
+    from { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+    to { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor; }
+}
+
 /* =========================================
-   初始選單介面 (#menu-layer)
+   2. 通用組件 (Common Components)
    ========================================= */
-#menu-layer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a12 100%);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    transition: opacity 0.5s ease;
-}
-
-.menu-content {
-    text-align: center;
-    animation: fadeInDown 0.8s ease-out;
-}
-
 .glow-title {
-    font-size: 64px;
+    font-size: clamp(32px, 10vw, 64px);
     color: #4ecca3;
     margin: 0;
     text-shadow: 0 0 20px rgba(78, 204, 163, 0.6), 0 0 40px rgba(78, 204, 163, 0.3);
-    letter-spacing: 4px;
-}
-
-.subtitle {
-    color: #888;
-    letter-spacing: 8px;
-    margin-bottom: 50px;
-    font-size: 14px;
-}
-
-.menu-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    align-items: center;
+    letter-spacing: 2px;
 }
 
 .btn {
-    width: 280px;
-    padding: 15px 25px;
+    width: 80vw;
+    max-width: 280px;
+    padding: 12px 25px;
     font-size: 18px;
     background: rgba(255, 255, 255, 0.05);
     color: white;
@@ -97,6 +83,40 @@ body {
     box-shadow: 0 0 25px rgba(52, 152, 219, 0.5);
 }
 
+/* =========================================
+   3. 初始選單介面 (#menu-layer)
+   ========================================= */
+#menu-layer {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a12 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    transition: opacity 0.5s ease;
+}
+
+.menu-content {
+    text-align: center;
+    animation: fadeInDown 0.8s ease-out;
+}
+
+.subtitle {
+    color: #888;
+    letter-spacing: 8px;
+    margin-bottom: 50px;
+    font-size: 14px;
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
 .footer-hint {
     margin-top: 60px;
     color: #555;
@@ -104,14 +124,12 @@ body {
 }
 
 /* =========================================
-   隊伍配置介面 (#selection-layer)
+   4. 隊伍配置與房間介面 (#selection-layer)
    ========================================= */
 #selection-layer {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: #0f3460;
     z-index: 900;
     display: flex;
@@ -126,12 +144,23 @@ body {
     text-align: center;
 }
 
+/* 豹豹選擇卷軸區域 */
 .type-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin: 30px 0;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+    max-height: 400px; 
+    overflow-y: auto;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: #4ecca3 transparent;
 }
+
+.type-container::-webkit-scrollbar { width: 6px; }
+.type-container::-webkit-scrollbar-thumb { background: #4ecca3; border-radius: 10px; }
 
 .type-card {
     background: rgba(255, 255, 255, 0.1);
@@ -152,365 +181,11 @@ body {
     box-shadow: 0 0 15px #4ecca3;
 }
 
-.type-icon {
-    font-size: 40px;
-    margin-bottom: 10px;
-}
+.type-icon { font-size: 40px; margin-bottom: 10px; }
+.type-name { font-size: 20px; font-weight: bold; display: block; }
+.type-stats { font-size: 14px; color: #ccc; margin-top: 10px; }
 
-.type-name {
-    font-size: 20px;
-    font-weight: bold;
-    display: block;
-}
-
-.type-stats {
-    font-size: 14px;
-    color: #ccc;
-    margin-top: 10px;
-}
-
-.preview-dots {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 15px 0;
-    min-height: 40px;
-}
-
-/* =========================================
-   遊戲主要圖層 (#game-layer)
-   ========================================= */
-#game-layer {
-    display: none; 
-    flex-direction: column;
-    align-items: center;
-    padding-top: 10px;
-    animation: fadeIn 1s ease;
-}
-
-#score-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 800px;
-    margin-bottom: 5px;
-}
-
-#game-title {
-    color: white;
-    font-size: 24px;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
-}
-
-.dots-group {
-    display: flex;
-    gap: 8px;
-}
-
-.dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background-color: #444;
-    border: 2px solid white;
-    transition: background-color 0.3s, box-shadow 0.3s;
-}
-
-.dot.blue-fill { background-color: #3498db; box-shadow: 0 0 8px #3498db; }
-.dot.red-fill { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
-
-#game-container {
-    position: relative;
-    border: 4px solid #4ecca3;
-    border-radius: 10px;
-    box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
-    touch-action: none;
-}
-
-#action-damage-text {
-    display: block;
-    margin-top: 5px;
-    color: #ffcc00;
-    font-size: 36px;
-    font-weight: bold;
-    text-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8);
-    opacity: 0;
-    transition: opacity 0.2s, transform 0.2s;
-    transform: scale(0.8);
-}
-
-#ui-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    pointer-events: none;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-    z-index: 10;
-}
-
-.stats {
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-#turn-display {
-    font-size: 20px;
-    margin-bottom: 2px;
-}
-
-#instruction {
-    font-size: 16px;
-    color: #aaa;
-}
-
-canvas {
-    background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
-    display: block;
-    touch-action: none; 
-    -webkit-tap-highlight-color: transparent;
-}
-
-@keyframes fadeInDown {
-    from { opacity: 0; transform: translateY(-30px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-
-/* 🔥 新增於 style.css 底部 */
-.big-text-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    font-size: 80px;
-    font-weight: 900;
-    color: #fff;
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 4px 4px 0px #000;
-    pointer-events: none;
-    z-index: 100;
-    white-space: nowrap;
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.big-text-overlay.show {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-}
-
-/* 🔥 新增於 style.css 底部 */
-#result-layer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(10, 10, 18, 0.85);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-    opacity: 0;
-    transition: opacity 0.8s ease;
-}
-
-.result-card {
-    background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 30px;
-    padding: 50px;
-    text-align: center;
-    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-    transform: translateY(30px);
-    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    width: 450px;
-}
-
-#result-layer.show { opacity: 1; }
-#result-layer.show .result-card { transform: translateY(0); }
-
-.winner-banner {
-    font-size: 56px;
-    font-weight: 900;
-    margin-bottom: 40px;
-    letter-spacing: 5px;
-    text-transform: uppercase;
-    animation: glowText 2s infinite alternate;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-    margin-bottom: 50px;
-}
-
-.stat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 25px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 15px;
-}
-
-.stat-label { color: #aaa; font-size: 16px; }
-.stat-value { color: #fff; font-size: 24px; font-weight: bold; font-family: 'Courier New', monospace; }
-
-.result-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.btn.restart { border-color: #4ecca3; background: rgba(78, 204, 163, 0.1); }
-.btn.restart:hover { background: #4ecca3; color: #1a1a2e; }
-
-@keyframes glowText {
-    from { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
-    to { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor; }
-}
-
-/* 🔥 新增於 style.css 底部 */
-.room-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    margin-bottom: 10px;
-    border-radius: 10px;
-    border: 1px solid rgba(78, 204, 163, 0.2);
-    transition: all 0.3s;
-}
-
-.room-item:hover {
-    background: rgba(78, 204, 163, 0.1);
-    transform: scale(1.02);
-}
-
-.room-info { text-align: left; }
-.room-name { font-weight: bold; color: #4ecca3; display: block; }
-.room-players { font-size: 12px; color: #888; }
-
-.join-btn {
-    background: #3498db;
-    border: none;
-    color: white;
-    padding: 8px 15px;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.join-btn:disabled { background: #444; cursor: not-allowed; }
-
-
-/* 🔥 新增於 style.css 底部 */
-#room-list-container {
-    max-height: 350px;
-    overflow-y: auto;
-    margin: 20px 0;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 15px;
-    padding: 15px;
-}
-
-.room-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    margin-bottom: 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(78, 204, 163, 0.2);
-    transition: transform 0.2s, background 0.2s;
-}
-
-.room-info {
-    text-align: left;
-}
-
-.room-name {
-    font-weight: bold;
-    color: #4ecca3;
-    display: block;
-    font-size: 18px;
-}
-
-.room-players {
-    font-size: 13px;
-    color: #888;
-}
-
-.join-btn {
-    background: #3498db;
-    border: none;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-/* 🔥 對戰室佈局 */
-.selection-flex-container {
-    display: flex;
-    gap: 20px;
-    margin: 20px 0;
-    align-items: flex-start;
-}
-
-.type-selection-area { flex: 2; }
-.status-board { 
-    flex: 1; 
-    background: rgba(0,0,0,0.4); 
-    padding: 20px; 
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
-.team-status-box {
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.team-status-box h4 { margin: 0 0 10px 0; color: #888; }
-
-.btn-small {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid #444;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 12px;
-    margin-top: 10px;
-}
-
-.btn-small:hover { background: #ff4444; }
-
-.preview-dots {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    min-height: 40px;
-}
-
-/* 🔥 對戰室佈局樣式 */
+/* 對戰室佈局 */
 .lobby-layout {
     display: flex;
     gap: 20px;
@@ -536,6 +211,13 @@ canvas {
 
 .panel-section h3 { margin: 0 0 10px 0; font-size: 18px; color: #888; }
 
+.preview-dots {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    min-height: 40px;
+}
+
 .reset-link {
     background: none; border: none; color: #ff4444; 
     cursor: pointer; font-size: 12px; margin-left: 10px;
@@ -549,52 +231,48 @@ canvas {
 
 .btn-quit:hover { background: #ff4444; color: white; }
 
-/* 🔥 修改 body：確保在手機上不會有滾動條且居中 */
-body {
-    margin: 0;
-    padding: 0;
-    background-color: #1a1a2e;
-    font-family: "Microsoft JhengHei", sans-serif;
+/* 房間列表 */
+#room-list-container {
+    max-height: 350px;
+    overflow-y: auto;
+    margin: 20px 0;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+}
+
+.room-item {
     display: flex;
-    flex-direction: column;
-    justify-content: center; /* 改為置中 */
+    justify-content: space-between;
     align-items: center;
-    height: 100vh;
-    height: 100dvh; /* 支援行動裝置動態高度 */
-    overflow: hidden;
-    touch-action: none;
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-/* 🔥 修改選單標題：在小螢幕縮小字體 */
-.glow-title {
-    font-size: clamp(32px, 10vw, 64px); /* 根據螢幕寬度自動縮放 */
-    color: #4ecca3;
-    margin: 0;
-    text-shadow: 0 0 20px rgba(78, 204, 163, 0.6), 0 0 40px rgba(78, 204, 163, 0.3);
-    letter-spacing: 2px;
-}
-
-/* 🔥 修改按鈕：確保不會超出螢幕寬度 */
-.btn {
-    width: 80vw;
-    max-width: 280px;
-    padding: 12px 20px;
-    font-size: 16px;
+    padding: 15px 20px;
     background: rgba(255, 255, 255, 0.05);
-    color: white;
-    border: 2px solid #4ecca3;
-    border-radius: 50px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(78, 204, 163, 0.2);
+    transition: transform 0.2s, background 0.2s;
 }
 
-/* 🔥 修改遊戲容器與計分板：寬度設為 100% */
+.room-info { text-align: left; }
+.room-name { font-weight: bold; color: #4ecca3; display: block; font-size: 18px; }
+.room-players { font-size: 13px; color: #888; }
+
+.join-btn {
+    background: #3498db; border: none; color: white;
+    padding: 10px 20px; border-radius: 8px; cursor: pointer;
+    font-weight: bold;
+}
+
+/* =========================================
+   5. 遊戲主要圖層 (#game-layer)
+   ========================================= */
+#game-layer {
+    display: none; 
+    flex-direction: column;
+    align-items: center;
+    animation: fadeIn 1s ease;
+}
+
 #score-container {
     display: flex;
     align-items: center;
@@ -608,33 +286,111 @@ body {
     color: white;
     font-size: clamp(14px, 4vw, 24px);
     font-weight: bold;
+    text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
 }
+
+.dots-group { display: flex; gap: 8px; }
+
+.dot {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background-color: #444;
+    border: 2px solid white;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.dot.blue-fill { background-color: #3498db; box-shadow: 0 0 8px #3498db; }
+.dot.red-fill { background-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
 
 #game-container {
     position: relative;
-    border: 2px solid #4ecca3;
+    border: 3px solid #4ecca3;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(78, 204, 163, 0.5);
-    touch-action: none;
-    max-width: 98vw; /* 確保不超出螢幕 */
+    max-width: 98vw;
     max-height: 80vh;
+    touch-action: none;
 }
 
 canvas {
     background: radial-gradient(circle, #16213e 0%, #0f3460 100%);
     display: block;
-    width: 100% !important;  /* 強制寬度 100% */
-    height: auto !important; /* 高度自動維持比例 */
+    width: 100% !important;
+    height: auto !important;
     touch-action: none; 
-    -webkit-tap-highlight-color: transparent;
 }
 
-/* 🔥 修改結算卡片：確保在小手機上能顯示完整 */
+#ui-layer {
+    position: absolute;
+    top: 0; left: 0; width: 100%;
+    pointer-events: none;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    z-index: 10;
+}
+
+.stats {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#turn-display { font-size: 20px; margin-bottom: 2px; }
+#instruction { font-size: 16px; color: #aaa; }
+
+#action-damage-text {
+    display: block;
+    margin-top: 5px;
+    color: #ffcc00;
+    font-size: 36px;
+    font-weight: bold;
+    text-shadow: 0 0 15px rgba(255, 204, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: scale(0.8);
+}
+
+.big-text-overlay {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 80px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 4px 4px 0px #000;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.big-text-overlay.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+
+/* =========================================
+   6. 結算介面 (#result-layer)
+   ========================================= */
+#result-layer {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(10, 10, 18, 0.85);
+    backdrop-filter: blur(15px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+#result-layer.show { opacity: 1; }
+
 .result-card {
     background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
     border: 1px solid rgba(255,255,255,0.2);
     border-radius: 20px;
-    padding: 20px;
+    padding: 30px;
     text-align: center;
     box-shadow: 0 25px 50px rgba(0,0,0,0.5);
     transform: translateY(30px);
@@ -643,55 +399,61 @@ canvas {
     max-width: 400px;
 }
 
+#result-layer.show .result-card { transform: translateY(0); }
+
 .winner-banner {
     font-size: clamp(24px, 8vw, 48px);
+    font-weight: 900;
     margin-bottom: 20px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    animation: glowText 2s infinite alternate;
 }
 
-/* 🔥 針對直向螢幕(手機)的微調 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 12px;
+}
+
+.stat-label { color: #aaa; font-size: 14px; }
+.stat-value { color: #fff; font-size: 20px; font-weight: bold; font-family: 'Courier New', monospace; }
+
+.result-buttons { display: flex; flex-direction: column; gap: 12px; }
+
+.btn.restart { border-color: #4ecca3; background: rgba(78, 204, 163, 0.1); }
+.btn.restart:hover { background: #4ecca3; color: #1a1a2e; }
+
+/* =========================================
+   7. 響應式微調 (Responsive Tweaks)
+   ========================================= */
 @media (max-width: 600px) {
     .lobby-layout {
         flex-direction: column;
         align-items: center;
     }
+    
     .selection-box, .status-panel {
         width: 100%;
     }
+    
     .type-container {
-        grid-template-columns: repeat(2, 1fr); /* 手機上變兩排 */
+        grid-template-columns: repeat(2, 1fr);
         gap: 10px;
+        max-height: 45vh;
     }
+    
     .big-text-overlay {
         font-size: 40px;
     }
-}
-/* 🔥 修改：讓豹豹選擇列表支援卷動 */
-.type-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
-    margin: 20px 0;
-    
-    /* 核心修改：限制最大高度並開啟垂直卷動 */
-    max-height: 400px; 
-    overflow-y: auto;
-    padding: 10px;
-    background: rgba(0, 0, 0, 0.2); /* 加上微弱背景色增加層次感 */
-    border-radius: 12px;
-    
-    /* 針對 Firefox 的滾動條樣式 */
-    scrollbar-width: thin;
-    scrollbar-color: #4ecca3 transparent;
-}
-
-/* 針對 Chrome/Safari/Edge 的滾動條美化 */
-.type-container::-webkit-scrollbar {
-    width: 6px;
-}
-.type-container::-webkit-scrollbar-track {
-    background: transparent;
-}
-.type-container::-webkit-scrollbar-thumb {
-    background: #4ecca3;
-    border-radius: 10px;
 }
