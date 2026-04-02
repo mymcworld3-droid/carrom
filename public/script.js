@@ -307,16 +307,17 @@ function confirmSelection() {
     startGame();
 }
 
+// 🔥 修改 script.js 中的 startGame 函式
 function startGame() {
-    document.getElementById('selection-layer').style.display = 'none';
-    document.getElementById('game-layer').style.display = 'flex';
-    
-    if (gameMode === 'online') {
-        initOnlineMode();
+    // 這個函式現在只處理單人或本機模式的切換
+    // 連線模式由 allPlayersReady 事件觸發
+    if (gameMode !== 'online') {
+        document.getElementById('selection-layer').style.display = 'none';
+        document.getElementById('game-layer').style.display = 'flex';
+        initGame();
+        updateExternalUI();
+        updateTurnDisplay();
     }
-    
-    initGame();
-    updateExternalUI();
 }
 
 // 🔥 核心物理衝突
