@@ -95,6 +95,18 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🔥 監聽玩家彈射動作並轉發給同房間的對手
+    socket.on('playerMove', (data) => {
+        // data 包含 roomId, id (豹豹ID), vx, vy
+        socket.to(data.roomId).emit('opponentMove', data);
+    });
+
+    // 🔥 監聽回合結束後的狀態同步，並更新給對手
+    socket.on('syncState', (data) => {
+        // data 包含所有的豹豹位置、血量以及目前的擊殺數、輪數等
+        socket.to(data.roomId).emit('updateClientState', data);
+    });
+
     socket.on('disconnect', () => {
         for (const id in rooms) {
             const index = rooms[id].players.findIndex(p => p.id === socket.id);
