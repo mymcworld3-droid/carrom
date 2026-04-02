@@ -382,3 +382,36 @@ canvas {
     from { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
     to { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor; }
 }
+
+/* 🔥 新增於 style.css 底部 */
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(78, 204, 163, 0.2);
+    transition: all 0.3s;
+}
+
+.room-item:hover {
+    background: rgba(78, 204, 163, 0.1);
+    transform: scale(1.02);
+}
+
+.room-info { text-align: left; }
+.room-name { font-weight: bold; color: #4ecca3; display: block; }
+.room-players { font-size: 12px; color: #888; }
+
+.join-btn {
+    background: #3498db;
+    border: none;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.join-btn:disabled { background: #444; cursor: not-allowed; }
