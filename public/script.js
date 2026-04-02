@@ -407,6 +407,7 @@ function startGame() {
     }
 }
 
+// 🔥 修改後的 resolveCollisions 區段
 function resolveCollisions() {
     for (let i = 0; i < leopards.length; i++) {
         for (let j = i + 1; j < leopards.length; j++) {
@@ -419,25 +420,44 @@ function resolveCollisions() {
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < b1.radius + b2.radius) {
-                // 🔥 修正：連線模式下，只有 Host (藍隊) 負責計算傷害與死亡
+                // 判斷是否為 Host 或單機模式，負責處理增傷判定
                 const canProcessDamage = (gameMode !== 'online') || (gameMode === 'online' && myTeam === 'blue');
 
+                // 🔥 疾風豹新能力：碰撞到任何豹豹（隊友或敵人）都增加攻擊力
+                if (canProcessDamage) {
+                    [b1, b2].forEach(leopard => {
+                        if (leopard.type === 'speedster') {
+                            leopard.atk += 10; // 每次碰撞增加 10 點攻擊
+                            damageTexts.push(new DamageText(leopard.x, leopard.y - 40, "加速! ATK+10", true));
+                            
+                            // 連線同步：發送 midMoveSync 給對手
+                            if (gameMode === 'online') {
+                                socket.emit('midMoveSync', { 
+                                    roomId: currentRoomId, 
+                                    id: leopard.id, 
+                                    type: 'buff', 
+                                    value: leopard.atk 
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // 戰吼豹邏輯 (原有的隊友碰撞增強)
                 if (b1.team === b2.team) {
                     if (activeStriker === b1 || activeStriker === b2) {
                         let striker = (activeStriker === b1) ? b1 : b2;
                         let target = (striker === b1) ? b2 : b1;
-                        if (striker.type === 'support') {
-                            if (canProcessDamage) {
-                                target.atk += 5;
-                                damageTexts.push(new DamageText(target.x, target.y - 40, "戰吼! ATK+5", true));
-                                // 廣播增益
-                                if (gameMode === 'online') {
-                                    socket.emit('midMoveSync', { roomId: currentRoomId, id: target.id, type: 'buff', value: target.atk });
-                                }
+                        if (striker.type === 'support' && canProcessDamage) {
+                            target.atk += 5;
+                            damageTexts.push(new DamageText(target.x, target.y - 40, "戰吼! ATK+5", true));
+                            if (gameMode === 'online') {
+                                socket.emit('midMoveSync', { roomId: currentRoomId, id: target.id, type: 'buff', value: target.atk });
                             }
                         }
                     }
                 } else {
+                    // 對手碰撞邏輯 (計算傷害與死亡)
                     let relVx = b1.vx - b2.vx;
                     let relVy = b1.vy - b2.vy;
                     let dotProduct = relVx * dx + relVy * dy;
@@ -450,10 +470,8 @@ function resolveCollisions() {
                         totalDamageDealt += attacker.atk;
                         currentActionDamage += attacker.atk;
                         
-                        // 產生文字與判定死亡
                         damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk, victim.hp <= 0));
                         
-                        // 廣播傷害給 Client
                         if (gameMode === 'online') {
                             socket.emit('midMoveSync', { 
                                 roomId: currentRoomId, 
@@ -474,7 +492,6 @@ function resolveCollisions() {
                     }
                 }
 
-                // 物理碰撞彈射 (這部分兩邊依然同時模擬，確保畫面流暢)
                 let collisionAngle = Math.atan2(dy, dx);
                 let speed1 = Math.sqrt(b1.vx * b1.vx + b1.vy * b1.vy);
                 let speed2 = Math.sqrt(b2.vx * b2.vx + b2.vy * b2.vy);
