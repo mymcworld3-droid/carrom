@@ -30,17 +30,17 @@
     <div class="selection-content">
         <div id="room-section">
             <h2 class="glow-title" style="font-size: 32px;">連線房間列表</h2>
-            <div id="room-list-container" style="max-height: 300px; overflow-y: auto; margin: 20px 0; background: rgba(0,0,0,0.3); border-radius: 15px; padding: 10px;">
-                <p style="color: #666;">正在尋找房間...</p>
+            <div id="room-list-container">
+                <p style="color: #666; padding: 20px;">正在尋找房間...</p>
             </div>
-            <div class="menu-buttons">
+            <div class="menu-buttons" style="margin-top: 20px;">
                 <button class="btn" onclick="createRoom()">➕ 創建新房間</button>
                 <button class="btn" style="border-color: #555;" onclick="location.reload()">🏠 返回主選單</button>
             </div>
         </div>
 
         <div id="leopard-selection-section" style="display: none;">
-            <h2 id="selection-title">正在加入房間...</h2>
+            <h2 id="selection-title">請配置隊伍</h2>
             <p id="room-display-id" style="color: #4ecca3; font-weight: bold;"></p>
             <p class="selection-hint">請選擇 3 隻豹豹參戰</p>
             <div class="type-container" id="type-list"></div>
