@@ -304,14 +304,12 @@ function updateSelectionPreview() {
 
 // 🔥 修改 script.js 中的 confirmSelection 函式
 function confirmSelection() {
-    let currentConfig = (myTeam === 'blue') ? blueTeamConfig : redTeamConfig;
-
+    let currentConfig = (selectingTeam === 'blue') ? blueTeamConfig : redTeamConfig;
     if (gameMode === 'online') {
-        // 連線模式：發送給伺服器，按鈕禁用等待
         document.getElementById('confirm-selection-btn').disabled = true;
         document.getElementById('confirm-selection-btn').innerText = "等待對手中...";
-        socket.emit('confirmSelection', { team: myTeam, config: currentConfig });
-        return; 
+        socket.emit('confirmSelection', { roomId: currentRoomId, team: myTeam, config: currentConfig });
+        return;
     }
 
     // 原有的單機/區域模式邏輯
