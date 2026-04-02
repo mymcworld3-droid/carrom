@@ -826,7 +826,8 @@ function handleEnd(e) {
     let dy = selectedLeopard.y - dragEndPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    if (dist > 5) {
+    // 🔥 將判定門檻從 5 提高到 15，讓玩家移回中心放開時能成功取消
+    if (dist > 15) {
         if (dist > MAX_DRAG) {
             const ratio = MAX_DRAG / dist;
             dx *= ratio; dy *= ratio;
@@ -835,17 +836,17 @@ function handleEnd(e) {
         const vx = dx * LAUNCH_FORCE_MULT;
         const vy = dy * LAUNCH_FORCE_MULT;
 
-        // 🔥 尋找 handleEnd 函式內的 socket.emit 部分
+        // 尋找 handleEnd 函式內的 socket.emit 部分
         if (gameMode === 'online') {
             socket.emit('playerMove', { 
-                roomId: currentRoomId, // 🔥 必須夾帶 roomId
+                roomId: currentRoomId, // 必須夾帶 roomId
                 id: selectedLeopard.id, 
                 vx, 
                 vy 
             });
         }
 
-        // 🔥 記錄主動彈射者
+        // 記錄主動彈射者
         activeStriker = selectedLeopard; 
         selectedLeopard.vx = vx;
         selectedLeopard.vy = vy;
