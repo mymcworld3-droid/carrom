@@ -67,6 +67,12 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 在 io.on('connection', ...) 內部加入
+    socket.on('midMoveSync', (data) => {
+        // data 包含 roomId, id (豹豹ID), type ('damage' 或 'death'), value (傷害值或剩餘血量)
+        socket.to(data.roomId).emit('updateMidMove', data);
+    });
+
     // 即時更新選擇狀態
     socket.on('updateSelection', (data) => {
         const { roomId, config } = data;
