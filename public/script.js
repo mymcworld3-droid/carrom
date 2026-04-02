@@ -550,6 +550,11 @@ function initOnlineMode() {
 
     socket.on('roomCreated', (data) => handleEnterRoom(data));
     socket.on('roomJoined', (data) => handleEnterRoom(data));
+    socket.on('opponentJoined', () => showBigAnnouncement("對手已加入", "#3498db"));
+    socket.on('opponentLeft', () => {
+        showBigAnnouncement("對手已離開", "#666");
+        setTimeout(() => location.reload(), 2000);
+    });
     
     socket.on('errorMsg', (msg) => alert(msg));
     
@@ -570,19 +575,15 @@ function initOnlineMode() {
         }, 1500);
     });
 
-    // 處理對手移動
     socket.on('opponentMove', (data) => {
         const leopard = leopards.find(l => l.id === data.id);
         if (leopard) {
             activeStriker = leopard;
-            leopard.vx = data.vx;
-            leopard.vy = data.vy;
-            leopard.hasMoved = true;
-            isProcessing = true;
+            leopard.vx = data.vx; leopard.vy = data.vy;
+            leopard.hasMoved = true; isProcessing = true;
         }
     });
 
-    // 狀態校準：由藍隊（通常是房主）發出的權威狀態
     socket.on('updateClientState', (data) => {
         data.leopards.forEach(remoteL => {
             const localL = leopards.find(l => l.id === remoteL.id);
@@ -591,15 +592,10 @@ function initOnlineMode() {
                 localL.hp = remoteL.hp; localL.atk = remoteL.atk;
             }
         });
-        blueKills = data.blueKills;
-        redKills = data.redKills;
-        totalDamageDealt = data.totalDamage;
-        roundCount = data.round;
-        firstTeam = data.firstTeam;
-        currentTurn = data.nextTurn;
-        
-        updateExternalUI();
-        updateTurnDisplay();
+        blueKills = data.blueKills; redKills = data.redKills;
+        totalDamageDealt = data.totalDamage; roundCount = data.round;
+        firstTeam = data.firstTeam; currentTurn = data.nextTurn;
+        updateExternalUI(); updateTurnDisplay();
     });
 }
 
