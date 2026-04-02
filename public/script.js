@@ -596,7 +596,35 @@ function initOnlineMode() {
     socket = io();
     socket.emit('getRooms');
 
-    // 對手即時選擇同步
+    // 🔥 核心修復：監聽伺服器廣播的房間列表，並動態生成「加入房間」按鈕
+    socket.on('roomListUpdate', (rooms) => {
+        const container = document.getElementById('room-list-container');
+        if (!container) return;
+        
+        if (rooms.length === 0) {
+            container.innerHTML = '<p style="color: #666; padding: 20px;">目前沒有開放中的房間</p>';
+            return;
+        }
+
+        container.innerHTML = rooms.map(room => `
+            <div class="room-item">
+                <div class="room-info">
+                    <span class="room-name">${room.name}</span>
+                    <span class="room-players">人數: ${room.playerCount}/2</span>
+                </div>
+                <button class="join-btn" onclick="socket.emit('joinRoom', '${room.id}')" ${room.playerCount >= 2 ? 'disabled' : ''}>
+                    ${room.playerCount >= 2 ? '已滿' : '加入房間'}
+                </button>
+            </div>
+        `).join('');
+    });
+
+    // 🔥 核心修復：監聽建立房間成功的訊息
+    socket.on('roomCreated', (data) => {
+        handleEnterRoom(data);
+        showBigAnnouncement("房間已建立", "#4ecca3");
+    });
+
     socket.on('opponentSelectionUpdate', (data) => {
         const preview = document.getElementById('opponent-selection-preview');
         const oppTeam = (myTeam === 'blue') ? 'red' : 'blue';
