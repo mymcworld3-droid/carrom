@@ -29,13 +29,13 @@
     <div id="selection-layer" style="display: none;">
     <div class="selection-content">
         <div id="room-section">
-            <h2 class="glow-title" style="font-size: 32px;">連線模式</h2>
-            <div class="menu-buttons" style="margin: 20px 0;">
+            <h2 class="glow-title" style="font-size: 32px;">連線房間列表</h2>
+            <div id="room-list-container" style="max-height: 300px; overflow-y: auto; margin: 20px 0; background: rgba(0,0,0,0.3); border-radius: 15px; padding: 10px;">
+                <p style="color: #666;">正在尋找房間...</p>
+            </div>
+            <div class="menu-buttons">
                 <button class="btn" onclick="createRoom()">➕ 創建新房間</button>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" id="room-input" placeholder="輸入房間代碼" style="padding: 12px; border-radius: 10px; border: none; width: 150px;">
-                    <button class="btn" style="width: 100px;" onclick="joinRoom()">加入</button>
-                </div>
+                <button class="btn" style="border-color: #555;" onclick="location.reload()">🏠 返回主選單</button>
             </div>
         </div>
 
