@@ -27,17 +27,30 @@
     </div>
 
     <div id="selection-layer" style="display: none;">
-        <div class="selection-content">
-            <h2 id="selection-title">藍隊 配置隊伍</h2>
-            <p class="selection-hint">請選擇 3 隻豹豹參戰</p>
-            <div class="type-container" id="type-list">
+    <div class="selection-content">
+        <div id="room-section">
+            <h2 class="glow-title" style="font-size: 32px;">連線模式</h2>
+            <div class="menu-buttons" style="margin: 20px 0;">
+                <button class="btn" onclick="createRoom()">➕ 創建新房間</button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="room-input" placeholder="輸入房間代碼" style="padding: 12px; border-radius: 10px; border: none; width: 150px;">
+                    <button class="btn" style="width: 100px;" onclick="joinRoom()">加入</button>
                 </div>
+            </div>
+        </div>
+
+        <div id="leopard-selection-section" style="display: none;">
+            <h2 id="selection-title">正在加入房間...</h2>
+            <p id="room-display-id" style="color: #4ecca3; font-weight: bold;"></p>
+            <p class="selection-hint">請選擇 3 隻豹豹參戰</p>
+            <div class="type-container" id="type-list"></div>
             <div class="selected-preview">
                 <h3>已選擇：</h3>
                 <div id="current-selection" class="preview-dots"></div>
             </div>
             <button id="confirm-selection-btn" class="btn" onclick="confirmSelection()" disabled>確認配置</button>
         </div>
+    </div>
     </div>
 
     <div id="game-layer" style="display: none;">
