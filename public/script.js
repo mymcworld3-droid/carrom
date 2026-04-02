@@ -474,6 +474,20 @@ function checkTurnSystem() {
     const movingLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
     if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
+        // 先執行同步，此時 activeStriker 還有值
+        if (gameMode === 'online' && activeStriker && activeStriker.team === myTeam) {
+            socket.emit('syncState', {
+                roomId: currentRoomId, 
+                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
+                blueKills,
+                redKills,
+                totalDamage: totalDamageDealt,
+                round: roundCount,
+                firstTeam: firstTeam,
+                nextTurn: currentTurn
+            });
+        }
+    
         isProcessing = false;
         activeStriker = null;
 
