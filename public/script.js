@@ -474,7 +474,7 @@ function checkTurnSystem() {
     const movingLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
     if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
-        // 先執行同步，此時 activeStriker 還有值
+        // 🔥 1. 先執行同步，此時 activeStriker 還有值，能判斷是否為「我方彈射」
         if (gameMode === 'online' && activeStriker && activeStriker.team === myTeam) {
             socket.emit('syncState', {
                 roomId: currentRoomId, 
@@ -488,6 +488,7 @@ function checkTurnSystem() {
             });
         }
     
+        // 🔥 2. 同步完後再清空狀態
         isProcessing = false;
         activeStriker = null;
 
@@ -518,20 +519,6 @@ function checkTurnSystem() {
 
         if (gameMode === 'single' && currentTurn === 'red') {
             setTimeout(makeAIMove, 1500);
-        }
-
-        // 🔥 修正：必須帶入 roomId 才能同步給正確的房間對手
-        if (gameMode === 'online' && activeStriker && activeStriker.team === myTeam) {
-            socket.emit('syncState', {
-                roomId: currentRoomId, 
-                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
-                blueKills,
-                redKills,
-                totalDamage: totalDamageDealt,
-                round: roundCount,
-                firstTeam: firstTeam,
-                nextTurn: currentTurn
-            });
         }
 
         const targetTeamCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
