@@ -44,7 +44,8 @@ let leopards = [];
 let damageTexts = []; 
 let particles = []; 
 let blueKills = 0;   
-let redKills = 0;    
+let redKills = 0;
+let totalDamageDealt = 0;
 let currentActionDamage = 0; 
 let currentTurn = 'blue'; 
 let isDragging = false;
@@ -338,6 +339,7 @@ function resolveCollisions() {
                         let victim = (attacker === b1) ? b2 : b1;
                         
                         victim.hp -= attacker.atk;
+                        totalDamageDealt += attacker.atk;
                         currentActionDamage += attacker.atk;
                         updateExternalUI();
 
