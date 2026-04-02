@@ -665,3 +665,33 @@ canvas {
         font-size: 40px;
     }
 }
+/* 🔥 修改：讓豹豹選擇列表支援卷動 */
+.type-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+    
+    /* 核心修改：限制最大高度並開啟垂直卷動 */
+    max-height: 400px; 
+    overflow-y: auto;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2); /* 加上微弱背景色增加層次感 */
+    border-radius: 12px;
+    
+    /* 針對 Firefox 的滾動條樣式 */
+    scrollbar-width: thin;
+    scrollbar-color: #4ecca3 transparent;
+}
+
+/* 針對 Chrome/Safari/Edge 的滾動條美化 */
+.type-container::-webkit-scrollbar {
+    width: 6px;
+}
+.type-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+.type-container::-webkit-scrollbar-thumb {
+    background: #4ecca3;
+    border-radius: 10px;
+}
