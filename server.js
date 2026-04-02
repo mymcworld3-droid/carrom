@@ -20,55 +20,80 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 🔥 修改 server.js 中的 io.on('connection') 部分
 let players = {}; // 追蹤連線玩家狀態
 
+// 🔥 修改 server.js：管理多房間邏輯
+let rooms = {}; 
+
 io.on('connection', (socket) => {
     console.log('玩家連線:', socket.id);
 
-    // 分派隊伍
-    const assignedTeam = io.engine.clientsCount % 2 === 1 ? 'blue' : 'red';
-    players[socket.id] = { team: assignedTeam, ready: false, config: null };
-    
-    socket.emit('initTeam', assignedTeam);
+    // 1. 創建房間
+    socket.on('createRoom', () => {
+        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        rooms[roomId] = {
+            players: [{ id: socket.id, team: 'blue', ready: false, config: null }],
+            status: 'waiting'
+        };
+        socket.join(roomId);
+        socket.emit('roomCreated', { roomId, team: 'blue' });
+    });
 
-    // 處理隊伍配置確認
-    // 🔥 修改 server.js 中的 confirmSelection 邏輯
+    // 2. 加入房間
+    socket.on('joinRoom', (roomId) => {
+        const room = rooms[roomId];
+        if (room && room.players.length < 2) {
+            room.players.push({ id: socket.id, team: 'red', ready: false, config: null });
+            socket.join(roomId);
+            socket.emit('roomJoined', { roomId, team: 'red' });
+            // 告訴房主有人進來了
+            io.to(roomId).emit('opponentJoined');
+        } else {
+            socket.emit('errorMsg', room ? '房間已滿' : '房間不存在');
+        }
+    });
+
+    // 3. 確認配置
     socket.on('confirmSelection', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].config = data.config;
-            players[socket.id].ready = true;
-        
-            // 廣播給對手，讓對手畫面顯示「對方已就緒」
-            socket.broadcast.emit('opponentReady', { team: data.team });
-        
-            const playerArray = Object.values(players);
-            const allReady = playerArray.length >= 2 && playerArray.every(p => p.ready);
-        
-            if (allReady) {
-                // 🔥 彙整兩邊的配置資料
-                const bluePlayer = playerArray.find(p => p.team === 'blue');
-                const redPlayer = playerArray.find(p => p.team === 'red');
+        const { roomId, config, team } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) {
+            player.config = config;
+            player.ready = true;
             
-                // 一次發送給所有人，確保資料同步
-                io.emit('allPlayersReady', {
-                    blueConfig: bluePlayer.config,
-                    redConfig: redPlayer.config
+            // 通知同房間的對手
+            socket.to(roomId).emit('opponentReady');
+
+            // 檢查是否雙方皆準備完成
+            if (room.players.length === 2 && room.players.every(p => p.ready)) {
+                const blue = room.players.find(p => p.team === 'blue');
+                const red = room.players.find(p => p.team === 'red');
+                io.to(roomId).emit('allPlayersReady', {
+                    blueConfig: blue.config,
+                    redConfig: red.config
                 });
             }
         }
     });
 
-    // 轉發動作
+    // 4. 轉發遊戲動作
     socket.on('playerMove', (data) => {
-        socket.broadcast.emit('opponentMove', data);
+        const { roomId } = data;
+        socket.to(roomId).emit('opponentMove', data);
     });
 
-    // 轉發物理狀態同步（由目前行動者發出，強制校準對手畫面）
     socket.on('syncState', (data) => {
-        socket.broadcast.emit('updateClientState', data);
+        const { roomId } = data;
+        socket.to(roomId).emit('updateClientState', data);
     });
 
     socket.on('disconnect', () => {
-        delete players[socket.id];
-        console.log('玩家斷線');
+        // 清理房間
+        for (const id in rooms) {
+            rooms[id].players = rooms[id].players.filter(p => p.id !== socket.id);
+            if (rooms[id].players.length === 0) delete rooms[id];
+        }
     });
 });
 
