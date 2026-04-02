@@ -17,9 +17,6 @@ const io = new Server(server, {
 // 指定靜態檔案目錄（存放 index.html, style.css, script.js 的地方）
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 🔥 修改 server.js 中的 io.on('connection') 部分
-let players = {}; // 追蹤連線玩家狀態
-
 // 🔥 將 server.js 的 io.on('connection', ...) 區塊完整替換為以下邏輯
 let rooms = {}; 
 
