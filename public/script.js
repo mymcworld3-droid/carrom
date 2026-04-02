@@ -268,22 +268,6 @@ function renderTypeSelection() {
     }
 }
 
-// 🔥 更新 selectType：加入同步發送
-function selectType(key) {
-    let teamToUpdate = (gameMode === 'online') ? myTeam : selectingTeam;
-    let currentConfig = (teamToUpdate === 'blue') ? blueTeamConfig : redTeamConfig;
-    
-    if (currentConfig.length < 3) {
-        currentConfig.push(key);
-        renderMySelection();
-
-        // 🔥 連線模式即時通知對手
-        if (gameMode === 'online') {
-            socket.emit('updateSelection', { roomId: currentRoomId, config: currentConfig });
-        }
-    }
-}
-
 
 function renderMySelection() {
     let team = (gameMode === 'online') ? myTeam : selectingTeam;
