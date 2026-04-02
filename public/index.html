@@ -30,9 +30,7 @@
         <div class="selection-content">
             <div id="room-section">
                 <h2 class="glow-title" style="font-size: 32px;">連線房間列表</h2>
-                <div id="room-list-container">
-                    <p style="color: #666; padding: 20px;">正在尋找房間...</p>
-                </div>
+                <div id="room-list-container"></div>
                 <div class="menu-buttons" style="margin-top: 20px;">
                     <button class="btn" onclick="createRoom()">➕ 創建新房間</button>
                     <button class="btn" style="border-color: #555;" onclick="location.reload()">🏠 返回主選單</button>
@@ -40,15 +38,34 @@
             </div>
 
             <div id="leopard-selection-section" style="display: none;">
-                <h2 id="selection-title">請配置隊伍</h2>
-                <p id="room-display-id" style="color: #4ecca3; font-weight: bold;"></p>
-                <p class="selection-hint">請選擇 3 隻豹豹參戰</p>
-                <div class="type-container" id="type-list"></div>
-                <div class="selected-preview">
-                    <h3>已選擇：</h3>
-                    <div id="current-selection" class="preview-dots"></div>
+                <div class="lobby-header">
+                    <h2 id="selection-title">正在配置...</h2>
+                    <p id="room-display-id"></p>
                 </div>
-                <button id="confirm-selection-btn" class="btn" onclick="confirmSelection()" disabled>確認配置</button>
+
+                <div class="selection-flex-container">
+                    <div class="type-selection-area">
+                        <div class="type-container" id="type-list"></div>
+                    </div>
+
+                    <div class="status-board">
+                        <div class="team-status-box my-status">
+                            <h4>我的隊伍</h4>
+                            <div id="current-selection" class="preview-dots"></div>
+                            <button class="btn-small" onclick="resetSelection()">清除重選</button>
+                        </div>
+                        <div class="team-status-box opponent-status">
+                            <h4>對手隊伍</h4>
+                            <div id="opponent-selection-preview" class="preview-dots"></div>
+                            <p id="opponent-ready-hint" style="font-size: 12px; color: #4ecca3; display:none;">READY!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="selection-footer">
+                    <button id="confirm-selection-btn" class="btn" onclick="confirmSelection()" disabled>確認配置</button>
+                    <button class="btn" style="border-color: #ff4444; width: 150px; font-size: 14px;" onclick="quitRoom()">離開房間</button>
+                </div>
             </div>
         </div>
     </div>
