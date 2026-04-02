@@ -595,6 +595,8 @@ function respawnLeopard(leopard) {
     leopard.vx = 0;
     leopard.vy = 0;
     leopard.hp = leopard.maxHp;
+    // 🔥 修改：死後重置攻擊力 (包含戰吼豹的增傷)
+    leopard.atk = leopard.baseAtk; 
     leopard.isDying = false;
 }
 
