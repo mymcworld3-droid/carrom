@@ -15,10 +15,23 @@ const MIN_SPEED = 0.2;
 const LAUNCH_FORCE_MULT = 0.15; 
 const MAX_DRAG = 150; 
 
+// 🔥 豹種定義
+const LEOPARD_TYPES = {
+    balanced: { name: '全能豹', icon: '🐾', hp: 100, atk: 20, desc: '屬性均衡，適合新手。' },
+    tank: { name: '重裝豹', icon: '🛡️', hp: 150, atk: 15, desc: '高生命力，極難被擊殺。' },
+    assassin: { name: '刺客豹', icon: '🗡️', hp: 70, atk: 35, desc: '極高攻擊，但非常脆弱。' },
+    support: { name: '戰吼豹', icon: '🔥', hp: 90, atk: 15, desc: '特殊能力：碰撞我方豹豹時，該隊友攻擊力 +5。' }
+};
+
 // 🔥 遊戲模式與連線變數
-let gameMode = 'local'; // 'single', 'local', 'online'
-let myTeam = 'blue';    // 連線模式下的玩家隊伍
-let socket = null;      // Socket.io 實例
+let gameMode = 'local'; 
+let myTeam = 'blue';    
+let socket = null;      
+
+// 🔥 配置階段變數
+let selectingTeam = 'blue'; 
+let blueTeamConfig = [];
+let redTeamConfig = [];
 
 // 🔥 動態攝影機與時間參數
 let camera = { x: 400, y: 300, zoom: 1, targetZoom: 1, targetX: 400, targetY: 300 };
@@ -82,6 +95,7 @@ class DamageText {
         this.vy = -1.5; 
         this.scale = isSpecial ? 2 : 1;
         this.color = isSpecial ? '#ff3333' : '#ffcc00';
+        if (typeof value === 'string') this.color = '#00ff00'; // 增益顏色
     }
     update() {
         this.y += this.vy * timeScale;
@@ -106,8 +120,10 @@ class DamageText {
 }
 
 class Leopard {
-    constructor(x, y, radius, color, team, id) {
+    constructor(x, y, radius, color, team, id, typeKey) {
+        const config = LEOPARD_TYPES[typeKey];
         this.id = id;
+        this.type = typeKey;
         this.x = x;
         this.y = y;
         this.radius = radius;
@@ -115,10 +131,12 @@ class Leopard {
         this.team = team;
         this.vx = 0;
         this.vy = 0;
-        this.hp = 100;
-        this.atk = 20;
+        this.hp = config.hp;
+        this.maxHp = config.hp;
+        this.atk = config.atk;
         this.hasMoved = false; 
         this.isDying = false; 
+        this.buffedThisTurn = false; // 用於防止同一回合重複獲得戰吼增益
     }
 
     draw() {
@@ -133,7 +151,6 @@ class Leopard {
         ctx.fill();
         
         if (!isProcessing && currentTurn === this.team && !this.hasMoved) {
-            // 連線模式只有自己的回合會亮黃圈
             if (gameMode !== 'online' || currentTurn === myTeam) {
                 ctx.strokeStyle = 'yellow';
                 ctx.lineWidth = 5;
@@ -150,6 +167,12 @@ class Leopard {
         }
         ctx.closePath();
 
+        // 繪製豹種圖標
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.font = '20px Arial';
+        ctx.fillText(LEOPARD_TYPES[this.type].icon, this.x, this.y + 7);
+
+        // 狀態欄
         ctx.fillStyle = 'white';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
@@ -199,193 +222,82 @@ class Leopard {
     }
 }
 
-// 🔥 連線模式初始化
-function initOnlineMode() {
-    if (typeof io === 'undefined') {
-        alert('未偵測到 Socket.io 函式庫，請檢查 HTML 引入');
+// 🔥 配置階段邏輯
+window.enterSelection = function(mode) {
+    gameMode = mode;
+    document.getElementById('menu-layer').style.display = 'none';
+    document.getElementById('selection-layer').style.display = 'flex';
+    
+    renderTypeSelection();
+};
+
+function renderTypeSelection() {
+    const list = document.getElementById('type-list');
+    list.innerHTML = '';
+    
+    for (let key in LEOPARD_TYPES) {
+        const type = LEOPARD_TYPES[key];
+        const card = document.createElement('div');
+        card.className = 'type-card';
+        card.onclick = () => selectType(key);
+        card.innerHTML = `
+            <div class="type-icon">${type.icon}</div>
+            <span class="type-name">${type.name}</span>
+            <div class="type-stats">HP: ${type.hp} | ATK: ${type.atk}</div>
+            <div style="font-size:12px; color:#888; margin-top:5px;">${type.desc}</div>
+        `;
+        list.appendChild(card);
+    }
+}
+
+function selectType(key) {
+    let currentConfig = (selectingTeam === 'blue') ? blueTeamConfig : redTeamConfig;
+    if (currentConfig.length < 3) {
+        currentConfig.push(key);
+        updateSelectionPreview();
+    }
+}
+
+function updateSelectionPreview() {
+    const preview = document.getElementById('current-selection');
+    const btn = document.getElementById('confirm-selection-btn');
+    let currentConfig = (selectingTeam === 'blue') ? blueTeamConfig : redTeamConfig;
+    
+    preview.innerHTML = currentConfig.map(key => `<div class="dot ${selectingTeam}-fill" style="width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:14px;">${LEOPARD_TYPES[key].icon}</div>`).join('');
+    
+    btn.disabled = currentConfig.length < 3;
+}
+
+function confirmSelection() {
+    if (gameMode === 'local' && selectingTeam === 'blue') {
+        selectingTeam = 'red';
+        document.getElementById('selection-title').innerText = '紅隊 配置隊伍';
+        updateSelectionPreview();
         return;
     }
-    socket = io();
-
-    socket.on('initTeam', (assignedTeam) => {
-        myTeam = assignedTeam;
-        console.log(`你是 ${myTeam === 'blue' ? '藍隊' : '紅隊'}`);
-    });
-
-    socket.on('opponentMove', (data) => {
-        const leopard = leopards.find(l => l.id === data.id);
-        if (leopard) {
-            leopard.vx = data.vx;
-            leopard.vy = data.vy;
-            leopard.hasMoved = true;
-            isProcessing = true;
-        }
-    });
-
-    // 每回合結束同步狀態，防止物理模擬分歧
-    socket.on('syncState', (data) => {
-        data.leopards.forEach(remoteL => {
-            const localL = leopards.find(l => l.id === remoteL.id);
-            if (localL) {
-                localL.x = remoteL.x;
-                localL.y = remoteL.y;
-                localL.hp = remoteL.hp;
-            }
-        });
-        blueKills = data.blueKills;
-        redKills = data.redKills;
-        updateExternalUI();
-    });
-}
-
-// 🔥 AI 行動邏輯
-function makeAIMove() {
-    if (gameOver || isProcessing) return;
-
-    const aiLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
-    if (aiLeopards.length === 0) return;
-
-    // 隨機選擇一隻紅隊豹豹
-    const attacker = aiLeopards[Math.floor(Math.random() * aiLeopards.length)];
-    // 瞄準最近的藍隊隊員
-    const enemies = leopards.filter(l => l.team === 'blue' && !l.isDying);
-    if (enemies.length === 0) return;
-
-    let closestEnemy = enemies[0];
-    let minDist = Infinity;
-    enemies.forEach(e => {
-        const d = Math.sqrt((e.x - attacker.x)**2 + (e.y - attacker.y)**2);
-        if (d < minDist) { minDist = d; closestEnemy = e; }
-    });
-
-    const dx = closestEnemy.x - attacker.x;
-    const dy = closestEnemy.y - attacker.y;
-    const angle = Math.atan2(dy, dx);
-    const force = Math.min(minDist * 0.4, MAX_DRAG);
-
-    attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
-    attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
-    attacker.hasMoved = true;
-    isProcessing = true;
-}
-
-function getPredictedCollision(attacker, dx, dy) {
-    const angle = Math.atan2(dy, dx);
-    const rayVx = Math.cos(angle);
-    const rayVy = Math.sin(angle);
     
-    let closestDist = Infinity;
-    let target = null;
-
-    leopards.forEach(l => {
-        if (l === attacker || l.isDying) return;
-
-        const toTargetX = l.x - attacker.x;
-        const toTargetY = l.y - attacker.y;
-        const projection = toTargetX * rayVx + toTargetY * rayVy;
-        
-        if (projection > 0) {
-            const nearestX = attacker.x + rayVx * projection;
-            const nearestY = attacker.y + rayVy * projection;
-            const distSq = (l.x - nearestX)**2 + (l.y - nearestY)**2;
-
-            const collisionDistThreshold = attacker.radius + l.radius;
-            if (distSq < collisionDistThreshold**2) {
-                const offset = Math.sqrt(collisionDistThreshold**2 - distSq);
-                const actualDist = projection - offset;
-
-                if (actualDist > 0 && actualDist < closestDist) {
-                    closestDist = actualDist;
-                    target = l;
-                }
-            }
-        }
-    });
-
-    if (target) {
-        const ghostX = attacker.x + rayVx * closestDist;
-        const ghostY = attacker.y + rayVy * closestDist;
-        return { hit: true, ghostX, ghostY, target };
+    // 如果是單人模式，AI 隨機選
+    if (gameMode === 'single') {
+        const keys = Object.keys(LEOPARD_TYPES);
+        redTeamConfig = [keys[Math.floor(Math.random()*keys.length)], keys[Math.floor(Math.random()*keys.length)], keys[Math.floor(Math.random()*keys.length)]];
     }
-    return { hit: false };
+
+    startGame();
 }
 
-function initScoreDots() {
-    blueDotsContainer.innerHTML = '';
-    redDotsContainer.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
-        const d1 = document.createElement('div'); d1.className = 'dot'; blueDotsContainer.appendChild(d1);
-        const d2 = document.createElement('div'); d2.className = 'dot'; redDotsContainer.appendChild(d2);
-    }
-}
-
-function updateExternalUI() {
-    const bDots = blueDotsContainer.children;
-    const rDots = redDotsContainer.children;
-    for (let i = 0; i < 5; i++) {
-        if (bDots[i]) bDots[i].classList.toggle('blue-fill', i < blueKills);
-        if (rDots[i]) rDots[i].classList.toggle('red-fill', i < redKills);
-    }
-
-    if (currentActionDamage > 0) {
-        actionDamageEl.innerText = `💥 行動總傷: ${Math.floor(currentActionDamage)}`;
-        actionDamageEl.style.opacity = '1';
-        actionDamageEl.style.transform = 'scale(1.2)';
-        setTimeout(() => {
-            actionDamageEl.style.transform = 'scale(1.0)';
-        }, 150);
-    }
-}
-
-function checkWinCondition() {
-    if (blueKills >= 5 || redKills >= 5) {
-        gameOver = true;
-        turnDisplay.innerText = blueKills >= 5 ? "藍隊獲勝！" : "紅隊獲勝！";
-        turnDisplay.style.color = "gold";
-        turnDisplay.style.fontSize = "32px";
-    }
-}
-
-function respawnLeopard(leopard) {
-    const points = leopard.team === 'blue' ? blueSpawns : redSpawns;
-    const enemies = leopards.filter(l => l.team !== leopard.team && !l.isDying);
+function startGame() {
+    document.getElementById('selection-layer').style.display = 'none';
+    document.getElementById('game-layer').style.display = 'flex';
     
-    let bestPoint = points[0];
-    let maxMinDist = -1;
-
-    points.forEach(p => {
-        let minDistToEnemy = Infinity;
-        enemies.forEach(e => {
-            let d = Math.sqrt((p.x - e.x)**2 + (p.y - e.y)**2);
-            if (d < minDistToEnemy) minDistToEnemy = d;
-        });
-        if (minDistToEnemy > maxMinDist) {
-            maxMinDist = minDistToEnemy;
-            bestPoint = p;
-        }
-    });
-
-    leopard.x = bestPoint.x;
-    leopard.y = bestPoint.y;
-    leopard.vx = 0;
-    leopard.vy = 0;
-    leopard.hp = 100;
-    leopard.isDying = false;
-    leopard.hasMoved = false;
+    if (gameMode === 'online') {
+        initOnlineMode();
+    }
+    
+    initGame();
+    updateExternalUI();
 }
 
-function initGame() {
-    initScoreDots();
-    leopards = [
-        new Leopard(150, 150, 25, '#3498db', 'blue', 1),
-        new Leopard(240, 300, 25, '#3498db', 'blue', 2), 
-        new Leopard(150, 450, 25, '#3498db', 'blue', 3),
-        new Leopard(650, 150, 25, '#e74c3c', 'red', 4),
-        new Leopard(560, 300, 25, '#e74c3c', 'red', 5), 
-        new Leopard(650, 450, 25, '#e74c3c', 'red', 6)
-    ];
-}
-
+// 🔥 核心物理衝突
 function resolveCollisions() {
     for (let i = 0; i < leopards.length; i++) {
         for (let j = i + 1; j < leopards.length; j++) {
@@ -398,7 +310,19 @@ function resolveCollisions() {
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < b1.radius + b2.radius) {
-                if (b1.team !== b2.team) {
+                // 🔥 特殊能力：戰吼 (Support)
+                if (b1.team === b2.team) {
+                    let active = (b1 === selectedLeopard || Math.abs(b1.vx) > 1) ? b1 : (b2 === selectedLeopard || Math.abs(b2.vx) > 1 ? b2 : null);
+                    if (active) {
+                        let other = (active === b1) ? b2 : b1;
+                        if (active.type === 'support' && !other.buffedThisTurn) {
+                            other.atk += 5;
+                            other.buffedThisTurn = true;
+                            damageTexts.push(new DamageText(other.x, other.y - 40, "ATK +5!", true));
+                        }
+                    }
+                } else {
+                    // 對手碰撞
                     let relVx = b1.vx - b2.vx;
                     let relVy = b1.vy - b2.vy;
                     let dotProduct = relVx * dx + relVy * dy;
@@ -416,6 +340,7 @@ function resolveCollisions() {
                     }
                 }
 
+                // 彈性碰撞物理
                 let collisionAngle = Math.atan2(dy, dx);
                 let speed1 = Math.sqrt(b1.vx * b1.vx + b1.vy * b1.vy);
                 let speed2 = Math.sqrt(b2.vx * b2.vx + b2.vy * b2.vy);
@@ -442,26 +367,6 @@ function resolveCollisions() {
     }
 }
 
-function drawArrow(context, fromx, fromy, tox, toy, color = 'yellow') {
-    const headlen = 15; 
-    const angle = Math.atan2(toy - fromy, tox - fromx);
-    context.save();
-    context.strokeStyle = color;
-    context.lineWidth = 4;
-    context.beginPath();
-    context.moveTo(fromx, fromy);
-    context.lineTo(tox, toy);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(tox, toy);
-    context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-    context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-    context.closePath();
-    context.fillStyle = color;
-    context.fill();
-    context.restore();
-}
-
 function checkTurnSystem() {
     if (gameOver) return;
 
@@ -469,14 +374,18 @@ function checkTurnSystem() {
     
     if (isProcessing && activeLeopards.length === 0 && !isSlowMo) {
         isProcessing = false;
-        leopards.forEach(l => { if (l.isDying) respawnLeopard(l); });
+        
+        // 🔥 回合結束，重置戰吼標記
+        leopards.forEach(l => { 
+            l.buffedThisTurn = false;
+            if (l.isDying) respawnLeopard(l); 
+        });
 
         const nextTeam = currentTurn === 'blue' ? 'red' : 'blue';
         const nextTeamCanMove = leopards.some(l => l.team === nextTeam && !l.hasMoved);
 
         if (nextTeamCanMove) {
             currentTurn = nextTeam;
-            // 單人模式 AI 行動
             if (gameMode === 'single' && currentTurn === 'red') {
                 setTimeout(makeAIMove, 800);
             }
@@ -491,10 +400,9 @@ function checkTurnSystem() {
         actionDamageEl.style.opacity = '0';
         currentActionDamage = 0;
 
-        // 連線模式下同步所有座標到 Server（由藍隊主導同步）
         if (gameMode === 'online' && myTeam === 'blue') {
             socket.emit('syncRequest', {
-                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp })),
+                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk })),
                 blueKills,
                 redKills
             });
@@ -504,35 +412,165 @@ function checkTurnSystem() {
     }
 }
 
+function initGame() {
+    initScoreDots();
+    leopards = [
+        new Leopard(150, 150, 25, '#3498db', 'blue', 1, blueTeamConfig[0]),
+        new Leopard(240, 300, 25, '#3498db', 'blue', 2, blueTeamConfig[1]), 
+        new Leopard(150, 450, 25, '#3498db', 'blue', 3, blueTeamConfig[2]),
+        new Leopard(650, 150, 25, '#e74c3c', 'red', 4, redTeamConfig[0]),
+        new Leopard(560, 300, 25, '#e74c3c', 'red', 5, redTeamConfig[1]), 
+        new Leopard(650, 450, 25, '#e74c3c', 'red', 6, redTeamConfig[2])
+    ];
+}
+
+function respawnLeopard(leopard) {
+    const points = leopard.team === 'blue' ? blueSpawns : redSpawns;
+    const enemies = leopards.filter(l => l.team !== leopard.team && !l.isDying);
+    
+    let bestPoint = points[0];
+    let maxMinDist = -1;
+
+    points.forEach(p => {
+        let minDistToEnemy = Infinity;
+        enemies.forEach(e => {
+            let d = Math.sqrt((p.x - e.x)**2 + (p.y - e.y)**2);
+            if (d < minDistToEnemy) minDistToEnemy = d;
+        });
+        if (minDistToEnemy > maxMinDist) {
+            maxMinDist = minDistToEnemy;
+            bestPoint = p;
+        }
+    });
+
+    leopard.x = bestPoint.x;
+    leopard.y = bestPoint.y;
+    leopard.vx = 0;
+    leopard.vy = 0;
+    leopard.hp = leopard.maxHp;
+    leopard.isDying = false;
+    leopard.hasMoved = false;
+}
+
+// --- 以下維持原有物理模擬與渲染邏輯 ---
+
+function initOnlineMode() {
+    if (typeof io === 'undefined') return;
+    socket = io();
+    socket.on('initTeam', (assignedTeam) => { myTeam = assignedTeam; });
+    socket.on('opponentMove', (data) => {
+        const leopard = leopards.find(l => l.id === data.id);
+        if (leopard) { leopard.vx = data.vx; leopard.vy = data.vy; leopard.hasMoved = true; isProcessing = true; }
+    });
+    socket.on('syncState', (data) => {
+        data.leopards.forEach(remoteL => {
+            const localL = leopards.find(l => l.id === remoteL.id);
+            if (localL) { localL.x = remoteL.x; localL.y = remoteL.y; localL.hp = remoteL.hp; localL.atk = remoteL.atk; }
+        });
+        blueKills = data.blueKills; redKills = data.redKills; updateExternalUI();
+    });
+}
+
+function makeAIMove() {
+    if (gameOver || isProcessing) return;
+    const aiLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
+    if (aiLeopards.length === 0) return;
+    const attacker = aiLeopards[Math.floor(Math.random() * aiLeopards.length)];
+    const enemies = leopards.filter(l => l.team === 'blue' && !l.isDying);
+    if (enemies.length === 0) return;
+    let closestEnemy = enemies[0];
+    let minDist = Infinity;
+    enemies.forEach(e => {
+        const d = Math.sqrt((e.x - attacker.x)**2 + (e.y - attacker.y)**2);
+        if (d < minDist) { minDist = d; closestEnemy = e; }
+    });
+    const dx = closestEnemy.x - attacker.x;
+    const dy = closestEnemy.y - attacker.y;
+    const angle = Math.atan2(dy, dx);
+    const force = Math.min(minDist * 0.4, MAX_DRAG);
+    attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.hasMoved = true; isProcessing = true;
+}
+
+function getPredictedCollision(attacker, dx, dy) {
+    const angle = Math.atan2(dy, dx);
+    const rayVx = Math.cos(angle); const rayVy = Math.sin(angle);
+    let closestDist = Infinity; let target = null;
+    leopards.forEach(l => {
+        if (l === attacker || l.isDying) return;
+        const toTargetX = l.x - attacker.x; const toTargetY = l.y - attacker.y;
+        const projection = toTargetX * rayVx + toTargetY * rayVy;
+        if (projection > 0) {
+            const nearestX = attacker.x + rayVx * projection; const nearestY = attacker.y + rayVy * projection;
+            const distSq = (l.x - nearestX)**2 + (l.y - nearestY)**2;
+            const collisionDistThreshold = attacker.radius + l.radius;
+            if (distSq < collisionDistThreshold**2) {
+                const offset = Math.sqrt(collisionDistThreshold**2 - distSq);
+                const actualDist = projection - offset;
+                if (actualDist > 0 && actualDist < closestDist) { closestDist = actualDist; target = l; }
+            }
+        }
+    });
+    if (target) { return { hit: true, ghostX: attacker.x + rayVx * closestDist, ghostY: attacker.y + rayVy * closestDist, target }; }
+    return { hit: false };
+}
+
+function initScoreDots() {
+    blueDotsContainer.innerHTML = ''; redDotsContainer.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+        const d1 = document.createElement('div'); d1.className = 'dot'; blueDotsContainer.appendChild(d1);
+        const d2 = document.createElement('div'); d2.className = 'dot'; redDotsContainer.appendChild(d2);
+    }
+}
+
+function updateExternalUI() {
+    const bDots = blueDotsContainer.children; const rDots = redDotsContainer.children;
+    for (let i = 0; i < 5; i++) {
+        if (bDots[i]) bDots[i].classList.toggle('blue-fill', i < blueKills);
+        if (rDots[i]) rDots[i].classList.toggle('red-fill', i < redKills);
+    }
+    if (currentActionDamage > 0) {
+        actionDamageEl.innerText = `💥 行動總傷: ${Math.floor(currentActionDamage)}`;
+        actionDamageEl.style.opacity = '1'; actionDamageEl.style.transform = 'scale(1.2)';
+        setTimeout(() => { actionDamageEl.style.transform = 'scale(1.0)'; }, 150);
+    }
+}
+
+function checkWinCondition() {
+    if (blueKills >= 5 || redKills >= 5) {
+        gameOver = true;
+        turnDisplay.innerText = blueKills >= 5 ? "藍隊獲勝！" : "紅隊獲勝！";
+        turnDisplay.style.color = "gold"; turnDisplay.style.fontSize = "32px";
+    }
+}
+
+function drawArrow(context, fromx, fromy, tox, toy, color = 'yellow') {
+    const headlen = 15; const angle = Math.atan2(toy - fromy, tox - fromx);
+    context.save(); context.strokeStyle = color; context.lineWidth = 4;
+    context.beginPath(); context.moveTo(fromx, fromy); context.lineTo(tox, toy); context.stroke();
+    context.beginPath(); context.moveTo(tox, toy);
+    context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+    context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+    context.closePath(); context.fillStyle = color; context.fill(); context.restore();
+}
+
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-    } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-    }
-    const x = (clientX - rect.left - canvas.width/2) / camera.zoom + camera.x;
-    const y = (clientY - rect.top - canvas.height/2) / camera.zoom + camera.y;
-    return { x, y };
+    if (e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+    else { clientX = e.clientX; clientY = e.clientY; }
+    return { x: (clientX - rect.left - canvas.width/2) / camera.zoom + camera.x, y: (clientY - rect.top - canvas.height/2) / camera.zoom + camera.y };
 }
 
 function handleStart(e) {
     if (isProcessing || gameOver) return;
-    // 連線模式檢查是否為自己的隊伍
     if (gameMode === 'online' && currentTurn !== myTeam) return;
-
     const pos = getPointerPos(e);
     leopards.forEach(l => {
         if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
             let dist = Math.sqrt((pos.x - l.x)**2 + (pos.y - l.y)**2);
-            if (dist < l.radius * 1.5) { 
-                selectedLeopard = l;
-                isDragging = true;
-                dragEndPos = { x: pos.x, y: pos.y };
-            }
+            if (dist < l.radius * 1.5) { selectedLeopard = l; isDragging = true; dragEndPos = { x: pos.x, y: pos.y }; }
         }
     });
     if (isDragging && e.cancelable) e.preventDefault();
@@ -541,39 +579,21 @@ function handleStart(e) {
 function handleMove(e) {
     if (!isDragging) return;
     const pos = getPointerPos(e);
-    dragEndPos.x = pos.x;
-    dragEndPos.y = pos.y;
+    dragEndPos.x = pos.x; dragEndPos.y = pos.y;
     if (e.cancelable) e.preventDefault();
 }
 
 function handleEnd(e) {
     if (!isDragging) return;
-    let dx = selectedLeopard.x - dragEndPos.x;
-    let dy = selectedLeopard.y - dragEndPos.y;
+    let dx = selectedLeopard.x - dragEndPos.x; let dy = selectedLeopard.y - dragEndPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
     if (dist > 5) {
-        if (dist > MAX_DRAG) {
-            const ratio = MAX_DRAG / dist;
-            dx *= ratio; dy *= ratio;
-        }
-
-        const vx = dx * LAUNCH_FORCE_MULT;
-        const vy = dy * LAUNCH_FORCE_MULT;
-
-        // 連線模式發送行動給對方
-        if (gameMode === 'online') {
-            socket.emit('playerMove', { id: selectedLeopard.id, vx, vy });
-        }
-
-        selectedLeopard.vx = vx;
-        selectedLeopard.vy = vy;
-        selectedLeopard.hasMoved = true;
-        isProcessing = true;
+        if (dist > MAX_DRAG) { const ratio = MAX_DRAG / dist; dx *= ratio; dy *= ratio; }
+        const vx = dx * LAUNCH_FORCE_MULT; const vy = dy * LAUNCH_FORCE_MULT;
+        if (gameMode === 'online') { socket.emit('playerMove', { id: selectedLeopard.id, vx, vy }); }
+        selectedLeopard.vx = vx; selectedLeopard.vy = vy; selectedLeopard.hasMoved = true; isProcessing = true;
     }
-
-    isDragging = false;
-    selectedLeopard = null;
+    isDragging = false; selectedLeopard = null;
 }
 
 canvas.addEventListener('mousedown', handleStart);
@@ -585,18 +605,10 @@ window.addEventListener('touchend', handleEnd);
 
 function updateCameraAndSlowMo() {
     timeScale += (targetTimeScale - timeScale) * 0.1;
-    
     if (isSlowMo) {
         slowMoTimer--;
-        if (slowMoTimer <= 0) {
-            isSlowMo = false;
-            targetTimeScale = 1.0;
-            camera.targetZoom = 1.0;
-            camera.targetX = 400;
-            camera.targetY = 300;
-        }
+        if (slowMoTimer <= 0) { isSlowMo = false; targetTimeScale = 1.0; camera.targetZoom = 1.0; camera.targetX = 400; camera.targetY = 300; }
     }
-
     camera.zoom += (camera.targetZoom - camera.zoom) * 0.1;
     camera.x += (camera.targetX - camera.x) * 0.1;
     camera.y += (camera.targetY - camera.y) * 0.1;
@@ -604,122 +616,40 @@ function updateCameraAndSlowMo() {
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
     updateCameraAndSlowMo();
-
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-camera.x, -camera.y);
 
     if (isDragging && selectedLeopard) {
-        let dx = selectedLeopard.x - dragEndPos.x;
-        let dy = selectedLeopard.y - dragEndPos.y;
+        let dx = selectedLeopard.x - dragEndPos.x; let dy = selectedLeopard.y - dragEndPos.y;
         const dist = Math.sqrt(dx**2 + dy**2);
-        
         if (dist > 5) {
-            let limitedDx = dx;
-            let limitedDy = dy;
-            if (dist > MAX_DRAG) {
-                const ratio = MAX_DRAG / dist;
-                limitedDx *= ratio; limitedDy *= ratio;
-            }
-
-            const prediction = getPredictedCollision(selectedLeopard, limitedDx, limitedDy);
-            
-            if (prediction.hit) {
-                ctx.save();
-                ctx.beginPath();
-                ctx.setLineDash([8, 6]);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.lineWidth = 2;
-                ctx.moveTo(selectedLeopard.x, selectedLeopard.y);
-                ctx.lineTo(prediction.ghostX, prediction.ghostY);
-                ctx.stroke();
-                ctx.restore();
-
-                ctx.save();
-                ctx.globalAlpha = 0.4;
-                ctx.beginPath();
-                ctx.arc(prediction.ghostX, prediction.ghostY, selectedLeopard.radius, 0, Math.PI * 2);
-                ctx.strokeStyle = 'white';
-                ctx.setLineDash([4, 4]);
-                ctx.stroke();
-                ctx.fillStyle = selectedLeopard.color;
-                ctx.fill();
-                ctx.restore();
-
-                const vLaunchX = limitedDx * LAUNCH_FORCE_MULT;
-                const vLaunchY = limitedDy * LAUNCH_FORCE_MULT;
-                const nx = (prediction.target.x - prediction.ghostX) / (selectedLeopard.radius + prediction.target.radius);
-                const ny = (prediction.target.y - prediction.ghostY) / (selectedLeopard.radius + prediction.target.radius);
-                const dot = vLaunchX * nx + vLaunchY * ny;
-                const vVictimX = dot * nx;
-                const vVictimY = dot * ny;
-                const vAttackerX = vLaunchX - vVictimX;
-                const vAttackerY = vLaunchY - vVictimY;
-
-                const arrowScale = 6;
-                drawArrow(ctx, prediction.target.x, prediction.target.y, prediction.target.x + vVictimX * arrowScale, prediction.target.y + vVictimY * arrowScale, '#ff4444');
-                drawArrow(ctx, prediction.ghostX, prediction.ghostY, prediction.ghostX + vAttackerX * arrowScale, prediction.ghostY + vAttackerY * arrowScale, 'yellow');
+            let limDx = dx, limDy = dy; if (dist > MAX_DRAG) { const r = MAX_DRAG / dist; limDx *= r; limDy *= r; }
+            const pred = getPredictedCollision(selectedLeopard, limDx, limDy);
+            if (pred.hit) {
+                ctx.save(); ctx.beginPath(); ctx.setLineDash([8, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.moveTo(selectedLeopard.x, selectedLeopard.y); ctx.lineTo(pred.ghostX, pred.ghostY); ctx.stroke(); ctx.restore();
+                ctx.save(); ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(pred.ghostX, pred.ghostY, selectedLeopard.radius, 0, Math.PI*2); ctx.fillStyle = selectedLeopard.color; ctx.fill(); ctx.restore();
             } else {
-                ctx.save();
-                ctx.setLineDash([8, 6]);
-                drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + limitedDx, selectedLeopard.y + limitedDy, 'rgba(255, 255, 255, 0.5)');
-                ctx.restore();
+                ctx.save(); ctx.setLineDash([8, 6]); drawArrow(ctx, selectedLeopard.x, selectedLeopard.y, selectedLeopard.x + limDx, selectedLeopard.y + limDy, 'rgba(255,255,255,0.5)'); ctx.restore();
             }
         }
     }
 
-    leopards.forEach(l => {
-        l.update();
-        l.draw();
-    });
-
+    leopards.forEach(l => { l.update(); l.draw(); });
     for (let i = particles.length - 1; i >= 0; i--) {
-        particles[i].update();
-        particles[i].draw();
+        particles[i].update(); particles[i].draw();
         if (particles[i].life <= 0) particles.splice(i, 1);
     }
-
     for (let i = damageTexts.length - 1; i >= 0; i--) {
-        damageTexts[i].update();
-        damageTexts[i].draw();
+        damageTexts[i].update(); damageTexts[i].draw();
         if (damageTexts[i].life <= 0) damageTexts.splice(i, 1);
     }
-
     resolveCollisions();
     checkTurnSystem();
-
     ctx.restore(); 
-
     requestAnimationFrame(gameLoop);
 }
 
-// 🔥 啟動遊戲的入口函式
-window.startGame = function(mode) {
-    gameMode = mode;
-    
-    const menu = document.getElementById('menu-layer');
-    const game = document.getElementById('game-layer');
-
-    // 開始淡出選單
-    menu.style.opacity = '0';
-    
-    setTimeout(() => {
-        // 隱藏選單並顯示遊戲圖層
-        menu.style.display = 'none';
-        game.style.display = 'flex';
-        
-        if (mode === 'online') {
-            initOnlineMode();
-        }
-        
-        // 初始化豹豹與計分板
-        initGame();
-        updateExternalUI();
-    }, 500);
-};
-
-// 啟動主迴圈（物體會在 startGame 呼叫 initGame 後產生）
 gameLoop();
