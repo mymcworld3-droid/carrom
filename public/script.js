@@ -268,17 +268,48 @@ function renderTypeSelection() {
     }
 }
 
-// 🔥 修改 selectType 函式，確保 myTeam 影響選人
+// 🔥 更新 selectType：加入同步發送
 function selectType(key) {
-    // 如果是連線模式，強制選擇自己隊伍的配置
     let teamToUpdate = (gameMode === 'online') ? myTeam : selectingTeam;
     let currentConfig = (teamToUpdate === 'blue') ? blueTeamConfig : redTeamConfig;
     
     if (currentConfig.length < 3) {
         currentConfig.push(key);
-        // 🔥 更新預覽時也使用對應的隊伍
-        updateSelectionPreviewForOnline(teamToUpdate);
+        renderMySelection();
+
+        // 🔥 連線模式即時通知對手
+        if (gameMode === 'online') {
+            socket.emit('updateSelection', { roomId: currentRoomId, config: currentConfig });
+        }
     }
+}
+
+// 🔥 新增：重選功能 (適用於所有模式)
+function resetSelection() {
+    if (gameMode === 'online') {
+        if (myTeam === 'blue') blueTeamConfig = [];
+        else redTeamConfig = [];
+        socket.emit('updateSelection', { roomId: currentRoomId, config: [] });
+    } else {
+        if (selectingTeam === 'blue') blueTeamConfig = [];
+        else redTeamConfig = [];
+    }
+    renderMySelection();
+    document.getElementById('confirm-selection-btn').disabled = true;
+}
+
+function renderMySelection() {
+    let team = (gameMode === 'online') ? myTeam : selectingTeam;
+    let config = (team === 'blue') ? blueTeamConfig : redTeamConfig;
+    const preview = document.getElementById('current-selection');
+    
+    preview.innerHTML = config.map(key => `
+        <div class="dot ${team}-fill" style="width:35px; height:35px; display:flex; align-items:center; justify-content:center; font-size:16px; border:2px solid gold;">
+            ${LEOPARD_TYPES[key].icon}
+        </div>
+    `).join('');
+    
+    document.getElementById('confirm-selection-btn').disabled = config.length < 3;
 }
 
 // 🔥 為了連線模式微調的預覽函式
