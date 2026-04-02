@@ -30,18 +30,28 @@ io.on('connection', (socket) => {
     socket.emit('initTeam', assignedTeam);
 
     // 處理隊伍配置確認
+    // 🔥 修改 server.js 中的 confirmSelection 邏輯
     socket.on('confirmSelection', (data) => {
         if (players[socket.id]) {
             players[socket.id].config = data.config;
             players[socket.id].ready = true;
-            
-            // 告訴對手：我選好了
-            socket.broadcast.emit('opponentReady', { team: data.team, config: data.config });
-            
-            // 檢查是否雙方都準備好
-            const allReady = Object.values(players).filter(p => p.ready).length >= 2;
+        
+            // 廣播給對手，讓對手畫面顯示「對方已就緒」
+            socket.broadcast.emit('opponentReady', { team: data.team });
+        
+            const playerArray = Object.values(players);
+            const allReady = playerArray.length >= 2 && playerArray.every(p => p.ready);
+        
             if (allReady) {
-                io.emit('allPlayersReady');
+                // 🔥 彙整兩邊的配置資料
+                const bluePlayer = playerArray.find(p => p.team === 'blue');
+                const redPlayer = playerArray.find(p => p.team === 'red');
+            
+                // 一次發送給所有人，確保資料同步
+                io.emit('allPlayersReady', {
+                    blueConfig: bluePlayer.config,
+                    redConfig: redPlayer.config
+                });
             }
         }
     });
