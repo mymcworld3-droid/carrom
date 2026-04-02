@@ -744,6 +744,22 @@ function initOnlineMode() {
         }
     });
 
+    // 在 initOnlineMode 內加入監聽
+    socket.on('updateMidMove', (data) => {
+        const leopard = leopards.find(l => l.id === data.id);
+        if (!leopard) return;
+    
+        if (data.type === 'damage') {
+            leopard.hp = data.hp;
+            damageTexts.push(new DamageText(leopard.x, leopard.y - 40, data.damage, leopard.hp <= 0));
+        } else if (data.type === 'death') {
+            if (!leopard.isDying) leopard.die();
+        } else if (data.type === 'buff') {
+            leopard.atk = data.value;
+            damageTexts.push(new DamageText(leopard.x, leopard.y - 40, "戰吼! ATK+5", true));
+        }
+    });
+
     // 🔥 在 initOnlineMode 函式中修改此監聽器
     socket.on('updateClientState', (data) => {
         data.leopards.forEach(remoteL => {
