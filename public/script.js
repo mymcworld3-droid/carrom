@@ -520,43 +520,33 @@ function respawnLeopard(leopard) {
     leopard.isDying = false;
 }
 
-// --- 以下維持原有物理模擬與渲染邏輯 ---
+// 房間操作函式
+function createRoom() { socket.emit('createRoom'); }
+function joinRoom() {
+    const id = document.getElementById('room-input').value;
+    if (id) socket.emit('joinRoom', id);
+}
 
-// 🔥 1. 修改 initOnlineMode 中的 initTeam 與 allPlayersReady 事件
 function initOnlineMode() {
-    if (typeof io === 'undefined') {
-        alert("找不到 Socket.io，請確認伺服器運作中");
-        return;
-    }
-    if (socket) return; 
-
+    if (socket) return;
     socket = io();
 
-    socket.on('initTeam', (assignedTeam) => {
-        myTeam = assignedTeam;
-        selectingTeam = assignedTeam; // 🔥 確保選人時是修改自己隊伍的 Config
-        const colorName = myTeam === 'blue' ? '藍隊' : '紅隊';
-        document.getElementById('selection-title').innerText = `你是 ${colorName} - 請配置隊伍`;
-        console.log(`分配隊伍: ${myTeam}`);
-    });
-
-    socket.on('opponentReady', (data) => {
-        // 可以在 UI 上顯示「對方已就緒」的提示
-        console.log('對手已完成配置，等待你確認');
+    socket.on('roomCreated', (data) => handleEnterRoom(data));
+    socket.on('roomJoined', (data) => handleEnterRoom(data));
+    socket.on('errorMsg', (msg) => alert(msg));
+    
+    socket.on('opponentReady', () => {
+        showBigAnnouncement("對手已就緒", "#4ecca3");
     });
 
     socket.on('allPlayersReady', (data) => {
-        // 🔥 接收伺服器彙整後的完整配置
         blueTeamConfig = data.blueConfig;
         redTeamConfig = data.redConfig;
-        
-        showBigAnnouncement("雙方就緒！戰鬥開始", "gold");
-        
+        showBigAnnouncement("戰鬥開始！", "gold");
         setTimeout(() => {
             document.getElementById('selection-layer').style.display = 'none';
             document.getElementById('game-layer').style.display = 'flex';
-            
-            initGame(); // 此時 Configs 已完整，豹豹會正常顯示
+            initGame();
             updateExternalUI();
             updateTurnDisplay();
         }, 1500);
