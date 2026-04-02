@@ -554,36 +554,32 @@ function joinRoom() {
     if (id) socket.emit('joinRoom', id);
 }
 
+// 🔥 更新 initOnlineMode：監聽對手的實時選擇
 function initOnlineMode() {
     if (socket) return;
     socket = io();
-
     socket.emit('getRooms');
 
-    socket.on('roomListUpdate', (rooms) => {
-        const container = document.getElementById('room-list-container');
-        if (rooms.length === 0) {
-            container.innerHTML = '<p style="color: #666; padding: 20px;">目前沒有房間，點擊下方按鈕創建一個！</p>';
-            return;
-        }
-        container.innerHTML = rooms.map(room => `
-            <div class="room-item">
-                <div class="room-info">
-                    <span class="room-name">${room.name}</span>
-                    <span class="room-players">目前人數: ${room.playerCount}/2</span>
-                </div>
-                <button class="join-btn" ${room.playerCount >= 2 ? 'disabled' : ''} onclick="joinRoom('${room.id}')">
-                    ${room.playerCount >= 2 ? '已滿' : '加入房間'}
-                </button>
+    socket.on('opponentSelectionUpdate', (data) => {
+        const preview = document.getElementById('opponent-selection-preview');
+        const oppTeam = (myTeam === 'blue') ? 'red' : 'blue';
+        preview.innerHTML = data.config.map(key => `
+            <div class="dot ${oppTeam}-fill" style="width:35px; height:35px; display:flex; align-items:center; justify-content:center; font-size:16px; opacity: 0.8;">
+                ${LEOPARD_TYPES[key].icon}
             </div>
         `).join('');
     });
 
-    socket.on('roomCreated', (data) => handleEnterRoom(data));
-    socket.on('roomJoined', (data) => handleEnterRoom(data));
-    socket.on('opponentJoined', () => showBigAnnouncement("對手已加入", "#3498db"));
+    socket.on('roomJoined', (data) => {
+        handleEnterRoom(data);
+        // 如果對方已經選了，顯示出來
+        if (data.opponentConfig) {
+            socket.emit('opponentSelectionUpdate', { config: data.opponentConfig });
+        }
+    });
+
     socket.on('opponentLeft', () => {
-        showBigAnnouncement("對手已離開", "#666");
+        showBigAnnouncement("對手逃跑了...", "#ff4444");
         setTimeout(() => location.reload(), 2000);
     });
     
