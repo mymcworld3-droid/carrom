@@ -479,7 +479,6 @@ function resolveCollisions() {
     }
 }
 
-// 🔥 修復後的回合管理系統
 function checkTurnSystem() {
     if (gameOver) return;
 
@@ -493,9 +492,13 @@ function checkTurnSystem() {
         
         isProcessing = false;
 
-        // 1. 處理重生與增益清理
+        // 1. 處理重生與狀態重置
         leopards.forEach(l => { 
             l.buffedThisTurn = false;
+            // 🔥 疾風豹回合結束重置攻擊力
+            if (l.type === 'speedster') {
+                l.atk = l.baseAtk;
+            }
             if (l.isDying) respawnLeopard(l); 
         });
 
@@ -530,7 +533,7 @@ function checkTurnSystem() {
         const statusText = currentTurn === firstTeam ? '先手' : '後手';
         showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
 
-        // 4. 連線同步：由發動攻擊的那一方統一發送最終結算狀態
+        // 4. 連線同步
         if (wasMyTurn) {
             socket.emit('syncState', {
                 roomId: currentRoomId, 
@@ -544,7 +547,7 @@ function checkTurnSystem() {
             });
         }
 
-        activeStriker = null; // 同步發送後才清理
+        activeStriker = null; 
 
         if (gameMode === 'single' && currentTurn === 'red') {
             setTimeout(makeAIMove, 1500);
