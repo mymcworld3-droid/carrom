@@ -228,18 +228,25 @@ class Leopard {
     }
 }
 
-// 🔥 修改 script.js 中的 enterSelection 函式
+// 🔥 修改 script.js：新增變數與房間函式
+let currentRoomId = null;
+
+// 入口修改
 window.enterSelection = function(mode) {
     gameMode = mode;
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('selection-layer').style.display = 'flex';
     
-    // 🔥 如果是連線模式，立刻建立 Socket 連線
     if (mode === 'online') {
+        document.getElementById('room-section').style.display = 'block';
+        document.getElementById('leopard-selection-section').style.display = 'none';
         initOnlineMode();
+    } else {
+        // 單機模式直接顯示選擇豹豹
+        document.getElementById('room-section').style.display = 'none';
+        document.getElementById('leopard-selection-section').style.display = 'block';
+        renderTypeSelection();
     }
-    
-    renderTypeSelection();
 };
 
 function renderTypeSelection() {
