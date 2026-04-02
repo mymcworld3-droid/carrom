@@ -214,7 +214,7 @@ class Leopard {
         }
 
         if (hitWall && this.type === 'speedster') {
-            this.atk += 5;
+            this.atk += 10;
             damageTexts.push(new DamageText(this.x, this.y - 40, "加速! ATK+5", true));
         }
     }
