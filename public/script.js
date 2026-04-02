@@ -820,12 +820,33 @@ function drawArrow(context, fromx, fromy, tox, toy, color = 'yellow') {
     context.closePath(); context.fillStyle = color; context.fill(); context.restore();
 }
 
+// 🔥 尋找 getPointerPos 函式並替換為以下內容
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
+    
+    // 計算 CSS 縮放後的比例
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
     let clientX, clientY;
-    if (e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
-    else { clientX = e.clientX; clientY = e.clientY; }
-    return { x: (clientX - rect.left - canvas.width/2) / camera.zoom + camera.x, y: (clientY - rect.top - canvas.height/2) / camera.zoom + camera.y };
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+
+    // 1. 先將點擊點轉為相對於 canvas 的座標
+    // 2. 乘以 scale 比例還原回 800x600 內部的座標
+    const canvasX = (clientX - rect.left) * scaleX;
+    const canvasY = (clientY - rect.top) * scaleY;
+
+    // 3. 考量攝影機(Camera)系統的位移與縮放
+    return {
+        x: (canvasX - canvas.width / 2) / camera.zoom + camera.x,
+        y: (canvasY - canvas.height / 2) / camera.zoom + camera.y
+    };
 }
 
 function handleStart(e) {
