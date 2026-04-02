@@ -127,9 +127,10 @@ class DamageText {
 
 class Leopard {
     constructor(x, y, radius, color, team, id, typeKey) {
-        const config = LEOPARD_TYPES[typeKey];
+        // 增加安全回退機制，若 typeKey 無效則預設為 balanced
+        const config = LEOPARD_TYPES[typeKey] || LEOPARD_TYPES['balanced']; 
         this.id = id;
-        this.type = typeKey;
+        this.type = typeKey || 'balanced';
         this.x = x;
         this.y = y;
         this.radius = radius;
