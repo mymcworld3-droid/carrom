@@ -52,6 +52,8 @@ let currentTurn = 'blue';
 let isDragging = false;
 let selectedLeopard = null;
 let dragEndPos = { x: 0, y: 0 };
+let lastBlueKills = 0;
+let lastRedKills = 0;
 let isProcessing = false; 
 let gameOver = false;
 
