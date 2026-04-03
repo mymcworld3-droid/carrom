@@ -917,14 +917,14 @@ async function makeAIMove() {
     isProcessing = true;
 }
 
+// 🔥 修改 performAIAction (約第 551 行)
 async function performAIAction(action) {
-    let [targetIdx, angleNorm, forceNorm] = action;
-    
-    angleNorm = Math.max(-1, Math.min(1, angleNorm));
-    forceNorm = Math.max(-1, Math.min(1, forceNorm));
-
     const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
-    if (myLeopards.length === 0) return;
+    if (myLeopards.length === 0) {
+        // 如果沒人能動，標記正在處理中，讓 checkTurnSystem 接手換邊
+        isProcessing = true; 
+        return;
+    }
 
     const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
     
