@@ -1091,13 +1091,30 @@ async function startTraining() {
     }
 }
 
-// 🔥 修正：依據四個課程階段初始化戰場環境
 function resetGameForTraining(level) {
     gameOver = false;
     blueKills = 0; redKills = 0;
     lastBlueKills = 0; lastRedKills = 0;
     roundCount = 1; currentTurn = 'red'; // 訓練時讓 AI (紅隊) 先攻
     isProcessing = false;
+    
+    // 🔥 修正：重置慢動作與攝影機狀態，避免前一局結束時的特效帶入新一局
+    isSlowMo = false;
+    timeScale = 1.0;
+    targetTimeScale = 1.0;
+    slowMoTimer = 0;
+    camera.targetZoom = 1.0;
+    camera.targetX = 400;
+    camera.targetY = 300;
+    camera.zoom = 1.0;
+    camera.x = 400;
+    camera.y = 300;
+
+    // 🔥 修正：清空殘留的特效文字與粒子，並強制隱藏可能開啟的結算 UI
+    particles = [];
+    damageTexts = [];
+    document.getElementById('result-layer').style.display = 'none';
+    document.getElementById('result-layer').classList.remove('show');
     
     // 清空現有豹豹
     leopards = [];
