@@ -828,6 +828,43 @@ function quitRoom() {
     location.reload(); // 最快的方式是重整，確保狀態乾淨
 }
 
+// 🔥 AI 訓練相關變數
+let isTraining = false;
+let trainRender = true;
+let aiModel = null;
+let curriculumLevel = 1; // 1: 打死固定目標, 2: 打死隨機目標, 3: 對戰弱 AI, 4: 完全體對戰
+let trainStats = { episodes: 0, wins: 0, rewards: [] };
+
+// 初始化 PPO 神經網路 (Actor-Critic 架構)
+async function initPPO() {
+    // 嘗試從本地讀取模型
+    try {
+        aiModel = await tf.loadLayersModel('localstorage://leopard-ppo-actor');
+        console.log("已載入現有 AI 模型");
+    } catch (e) {
+        console.log("建立新 AI 模型...");
+        const input = tf.input({shape: [24]}); // 狀態: 6隻豹的(x,y,hp,team) + 剩餘血量等
+        let l1 = tf.layers.dense({units: 128, activation: 'relu'}).apply(input);
+        let l2 = tf.layers.dense({units: 128, activation: 'relu'}).apply(l1);
+        
+        // Actor: 輸出動作 (選擇哪隻, 角度, 力度)
+        const actorOutput = tf.layers.dense({units: 3, activation: 'tanh'}).apply(l2);
+        aiModel = tf.model({inputs: input, outputs: actorOutput});
+        aiModel.compile({optimizer: tf.train.adam(0.0003), loss: 'meanSquaredError'});
+    }
+}
+
+// 獲取環境狀態 (Observation)
+function getGameStateTensor() {
+    let state = [];
+    leopards.forEach(l => {
+        state.push(l.x / 800, l.y / 600, l.hp / 150, l.team === 'blue' ? 1 : 0);
+    });
+    // 補齊到 24 個特徵 (若豹豹死亡則補 0)
+    while(state.length < 24) state.push(0);
+    return tf.tensor2d([state]);
+}
+
 function makeAIMove() {
     if (gameOver || isProcessing) return;
     // 如果有訓練好的模型，優先使用模型
