@@ -1324,11 +1324,17 @@ function showBigAnnouncement(text, color = "white") {
 }
 
 function gameLoop() {
-    // 🔥 如果在訓練且不渲染，則跳過繪圖，只跑邏輯
+    // 🔥 修改：即便不渲染，也要更新慢動作計時器，否則回合系統會卡死
+    updateCameraAndSlowMo();
+
     if (isTraining && !trainRender) {
+        // 在不渲染模式下，我們手動觸發物理邏輯以維持系統運作
+        resolveCollisions();
+        checkTurnSystem();
         requestAnimationFrame(gameLoop);
         return; 
     }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     updateCameraAndSlowMo();
     ctx.save();
