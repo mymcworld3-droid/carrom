@@ -907,22 +907,29 @@ async function makeAIMove() {
     isProcessing = true;
 }
 
-// 2. 定義執行 AI 動作的函式
+// 🔥 缺失函式：將 AI 的輸出轉換為實際的彈射動作
 async function performAIAction(action) {
     const [targetIdx, angleNorm, forceNorm] = action;
     const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
     if (myLeopards.length === 0) return;
 
-    // 映射 AI 輸出到遊戲參數
+    // 映射 AI 輸出到豹豹、角度與力度
     const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
-    const angle = angleNorm * Math.PI; // -PI ~ PI
-    const force = (forceNorm + 1) * 0.5 * MAX_DRAG; // 0 ~ MAX_DRAG (tanh 轉 0~1)
+    const angle = angleNorm * Math.PI; 
+    const force = (forceNorm + 1) * 0.5 * MAX_DRAG; 
 
     activeStriker = attacker;
     attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
     attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
     attacker.hasMoved = true;
     isProcessing = true;
+    
+    // 等待物理停止或超時
+    let timeout = 0;
+    while (isProcessing && timeout < 200) {
+        await new Promise(r => setTimeout(r, 50));
+        timeout++;
+    }
 }
 
 // 3. 定義訓練時藍隊的隨機動作
