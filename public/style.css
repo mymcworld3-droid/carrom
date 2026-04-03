@@ -457,3 +457,16 @@ canvas {
         font-size: 40px;
     }
 }
+
+/* 🔥 增加訓練 UI 樣式 */
+#training-ui label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+#ai-train-btn:hover {
+    background: rgba(255, 204, 0, 0.2) !important;
+}
