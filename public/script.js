@@ -914,11 +914,18 @@ async function makeAIMove() {
 }
 
 async function performAIAction(action) {
-    const [targetIdx, angleNorm, forceNorm] = action;
+    let [targetIdx, angleNorm, forceNorm] = action;
+    
+    // 🔥 強制數值限制在 -1 ~ 1 之間
+    angleNorm = Math.max(-1, Math.min(1, angleNorm));
+    forceNorm = Math.max(-1, Math.min(1, forceNorm));
+
     const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
     if (myLeopards.length === 0) return;
 
     const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
+    
+    // 🔥 角度映射：-1~1 對應 -π ~ π，確保 360 度全方位
     const angle = angleNorm * Math.PI; 
     const force = (forceNorm + 1) * 0.5 * MAX_DRAG; 
 
@@ -926,7 +933,7 @@ async function performAIAction(action) {
     attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
     attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
     attacker.hasMoved = true;
-    isProcessing = true; // 設定為 true，主迴圈就會開始等待
+    isProcessing = true;
 }
 
 // 🔥 缺失函式：訓練期間藍隊（對手）的隨機動作邏輯
