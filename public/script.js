@@ -837,22 +837,28 @@ let aiModel = null;
 let curriculumLevel = 1; // 1: 打死固定目標, 2: 打死隨機目標, 3: 對戰弱 AI, 4: 完全體對戰
 let trainStats = { episodes: 0, wins: 0, rewards: [] };
 
-// 初始化 PPO 神經網路 (Actor-Critic 架構)
+// 🔥 修改 initPPO：支援從本地或 GitHub (URL) 載入 AI 模型
 async function initPPO() {
-    // 嘗試從本地讀取模型
     try {
-        aiModel = await tf.loadLayersModel('localstorage://leopard-ppo-actor');
-        console.log("已載入現有 AI 模型");
+        // 優先嘗試從瀏覽器本地儲存空間讀取
+        try {
+            aiModel = await tf.loadLayersModel('localstorage://leopard-ppo-model');
+            console.log("已載入本地訓練模型");
+        } catch (e) {
+            // 如果本地沒模型，則嘗試載入 GitHub 上的檔案 (假設你已上傳至 public/model/)
+            aiModel = await tf.loadLayersModel('./model/leopard-ppo-model.json');
+            console.log("已從 GitHub 目錄載入預訓練模型");
+        }
     } catch (e) {
-        console.log("建立新 AI 模型...");
-        const input = tf.input({shape: [24]}); // 狀態: 6隻豹的(x,y,hp,team) + 剩餘血量等
+        console.log("找不到現成模型，建立新的 AI 神經網路...");
+        const input = tf.input({shape: [24]}); // 狀態輸入
         let l1 = tf.layers.dense({units: 128, activation: 'relu'}).apply(input);
         let l2 = tf.layers.dense({units: 128, activation: 'relu'}).apply(l1);
         
-        // Actor: 輸出動作 (選擇哪隻, 角度, 力度)
-        const actorOutput = tf.layers.dense({units: 3, activation: 'tanh'}).apply(l2);
-        aiModel = tf.model({inputs: input, outputs: actorOutput});
-        aiModel.compile({optimizer: tf.train.adam(0.0003), loss: 'meanSquaredError'});
+        // 動作輸出：選擇索引, 角度, 力度
+        const output = tf.layers.dense({units: 3, activation: 'tanh'}).apply(l2);
+        aiModel = tf.model({inputs: input, outputs: output});
+        aiModel.compile({optimizer: tf.train.adam(0.0005), loss: 'meanSquaredError'});
     }
 }
 
