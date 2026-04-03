@@ -30,6 +30,15 @@
         </div>
     </div>
 
+    <div id="training-status-bar" style="display: none; position: fixed; top: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: #ffcc00; padding: 10px; z-index: 3000; font-size: 14px; text-align: center; border-bottom: 2px solid #ffcc00;">
+        課程等級: <span id="curr-level">1</span> | 
+        回合: <span id="train-episodes">0</span> | 
+        勝率: <span id="win-rate">0%</span> | 
+        <label style="cursor: pointer; margin-left: 15px;"><input type="checkbox" id="render-toggle" checked> 顯示畫面</label>
+        <button onclick="saveAIModel()" style="margin-left: 15px; background: #ffcc00; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: bold;">💾 匯出模型</button>
+        <button onclick="stopTraining()" style="margin-left: 10px; background: #ff4444; color: white; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer;">停止</button>
+    </div>
+
     <div id="selection-layer" style="display: none;">
         <div class="selection-content">
             <div id="room-section">
@@ -90,47 +99,7 @@
     </div>
 
     <div id="result-layer" style="display: none;">
-        <div class="result-card">
-            <div id="winner-banner" class="winner-banner">BLUE VICTORY</div>        
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-label">總擊殺</span>
-                    <span id="final-kills" class="stat-value">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">總造成傷害</span>
-                    <span id="final-damage" class="stat-value">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">戰鬥輪數</span>
-                    <span id="final-rounds" class="stat-value">0</span>
-                </div>
-            </div>
-
-            <div class="result-buttons">
-                <button class="btn restart" onclick="location.reload()">
-                    <span class="btn-icon">🔄</span> 再戰一場
-                </button>
-                <button class="btn menu" onclick="location.reload()">
-                    <span class="btn-icon">🏠</span> 回到選單
-                </button>
-            </div>
         </div>
-    </div>
-
-    <div id="training-ui" style="display: none; position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 10px; z-index: 3000; font-size: 14px; width: 250px;">
-        <h3 style="margin-top:0; color:#ffcc00;">AI 課程訓練中...</h3>
-        <div id="train-stats">
-            課程等級: <span id="curr-level">1</span><br>
-            訓練回合: <span id="train-episodes">0</span><br>
-            目前勝率: <span id="win-rate">0%</span><br>
-            累積獎勵: <span id="avg-reward">0</span>
-        </div>
-        <hr>
-        <label><input type="checkbox" id="render-toggle" checked> 顯示畫面 (渲染)</label><br>
-        <button class="btn" style="width:100%; margin-top:10px; font-size:14px; padding:5px;" onclick="saveAIModel()">💾 匯出並應用模型</button>
-        <button class="btn-quit" onclick="stopTraining()">停止訓練</button>
-    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
