@@ -1218,7 +1218,11 @@ function checkWinCondition() {
         gameOver = true;
         
         const winner = blueKills >= 5 ? 'blue' : 'red';
-        showFinalResult(winner);
+        
+        // 🔥 修正：訓練模式下不顯示結算畫面，避免干擾自動訓練流程
+        if (!isTraining) {
+            showFinalResult(winner);
+        }
     }
 }
 
