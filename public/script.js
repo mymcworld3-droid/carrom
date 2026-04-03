@@ -932,7 +932,6 @@ async function makeAIMove() {
 async function performAIAction(action) {
     let [targetIdx, angleNorm, forceNorm] = action;
     
-    // 🔥 強制數值限制在 -1 ~ 1 之間
     angleNorm = Math.max(-1, Math.min(1, angleNorm));
     forceNorm = Math.max(-1, Math.min(1, forceNorm));
 
@@ -941,11 +940,12 @@ async function performAIAction(action) {
 
     const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
     
-    // 🔥 角度映射：-1~1 對應 -π ~ π，確保 360 度全方位
     const angle = angleNorm * Math.PI; 
     const force = (forceNorm + 1) * 0.5 * MAX_DRAG; 
 
     activeStriker = attacker;
+    currentActionHits = 0; // 🔥 發動前重置計數
+    currentActionDamage = 0; // 🔥 發動前重置傷害
     attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
     attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
     attacker.hasMoved = true;
