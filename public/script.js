@@ -953,32 +953,32 @@ function makeRandomPlayerMove() {
     isProcessing = true;
 }
 
+// 🔥 修改 calculateReward (約第 592 行)
 function calculateReward() {
     let r = 0;
     
     if (curriculumLevel === 1) {
-        // 第一階段：鼓勵連續碰撞
+        // 第一階段：純粹以「打到」為目標
         if (currentActionHits > 0) {
-            // 基本獎勵 + (碰撞次數的平方)，次數越多獎勵呈指數成長
+            // 基本獎勵 + (碰撞次數的平方)
             r += (currentActionHits * 5.0) + Math.pow(currentActionHits, 2) * 2; 
         } else {
-            r -= 2.0; // 未命中的懲罰稍微加重
+            // 🔥 沒打中時扣分，強制 AI 必須去尋找目標
+            r -= 2.5; 
         }
         
-        let ai = leopards.find(l => l.team === 'red' && !l.isDying);
-        if (ai && ai.x > 50 && ai.x < 750 && ai.y > 50 && ai.y < 550) {
-            r += 0.1; 
-        }
+        // 🔥 已刪除：原本的「在場內加分 (r += 0.1)」，避免 AI 為了領補助金而偷懶不動
     }
     else if (curriculumLevel === 2) {
-        // 第二階段：撞牆加成
+        // 第二階段：撞牆加成 (Level 2 依然保留，因為這階段需要練習走位)
         if (activeStriker && activeStriker.type === 'speedster' && currentActionDamage > 0) {
             let wallBounceCount = (activeStriker.atk - activeStriker.baseAtk) / 10;
             r += (wallBounceCount > 0) ? (2.0 + wallBounceCount * 1.0) : 0.5;
         } else if (currentActionDamage === 0) {
-            r -= 0.5;
+            r -= 1.0;
         }
     } 
+
     else if (curriculumLevel === 3) {
         // 第三階段：英雄協作
         leopards.filter(l => l.team === 'red').forEach(l => {
