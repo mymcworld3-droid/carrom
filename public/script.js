@@ -907,6 +907,72 @@ async function makeAIMove() {
     isProcessing = true;
 }
 
+// 2. 定義執行 AI 動作的函式
+async function performAIAction(action) {
+    const [targetIdx, angleNorm, forceNorm] = action;
+    const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
+    if (myLeopards.length === 0) return;
+
+    // 映射 AI 輸出到遊戲參數
+    const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
+    const angle = angleNorm * Math.PI; // -PI ~ PI
+    const force = (forceNorm + 1) * 0.5 * MAX_DRAG; // 0 ~ MAX_DRAG (tanh 轉 0~1)
+
+    activeStriker = attacker;
+    attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.hasMoved = true;
+    isProcessing = true;
+}
+
+// 3. 定義訓練時藍隊的隨機動作
+function makeRandomPlayerMove() {
+    if (gameOver || isProcessing) return;
+    const pLeopards = leopards.filter(l => l.team === 'blue' && !l.hasMoved && !l.isDying);
+    if (pLeopards.length === 0) return;
+
+    const attacker = pLeopards[Math.floor(Math.random() * pLeopards.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const force = 50 + Math.random() * 100;
+
+    attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
+    attacker.hasMoved = true;
+    isProcessing = true;
+}
+
+// 4. 修正獎勵計算與狀態追蹤
+function calculateReward() {
+    let r = 0;
+    // 擊中敵人給獎勵 (currentActionDamage 來自 resolveCollisions)
+    r += currentActionDamage * 0.1;
+    
+    // 擊殺敵人大獎勵
+    if (blueKills > lastBlueKills) {
+        r += 50;
+        lastBlueKills = blueKills;
+    }
+    
+    // 自己被擊殺扣分
+    if (redKills > lastRedKills) {
+        r -= 30;
+        lastRedKills = redKills;
+    }
+    
+    // 每一輪給予極小的負分，鼓勵 AI 儘快結束戰鬥
+    r -= 0.1; 
+    return r;
+}
+
+// 6. 在進入選單時就嘗試讀取模型，讓單人模式生效
+const originalEnterSelection = window.enterSelection;
+window.enterSelection = async function(mode) {
+    if (mode === 'single' && !aiModel) {
+        await initPPO();
+    }
+    originalEnterSelection(mode);
+};
+
 async function startTraining() {
     isTraining = true;
     gameMode = 'single';
