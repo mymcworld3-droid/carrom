@@ -819,6 +819,22 @@ let aiModel = null;
 let curriculumLevel = 1; // 1: 打死固定目標, 2: 打死隨機目標, 3: 對戰弱 AI, 4: 完全體對戰
 let trainStats = { episodes: 0, wins: 0, rewards: [] };
 let trainingSpeed = 1;
+let isManualDemo = false;
+let userMemories = []; // 存放高手操作精華
+let pendingMemory = null; // 暫存目前的動作，等物理跑完看有沒有打到
+
+// 🔥 新增：切換手動示範
+function toggleManualDemo() {
+    isManualDemo = !isManualDemo;
+    const btn = document.getElementById('manual-demo-btn');
+    btn.innerText = isManualDemo ? "🚀 示範錄製中..." : "🎮 開啟手動示範";
+    btn.style.background = isManualDemo ? "#ff4444" : "#4ecca3";
+    btn.style.color = isManualDemo ? "white" : "#1a1a2e";
+    
+    if (isManualDemo) {
+        showBigAnnouncement("手動模式：請親自下場彈射", "#4ecca3");
+    }
+}
 
 function updateSpeedDisplay(val) {
     trainingSpeed = parseInt(val);
