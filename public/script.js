@@ -1001,15 +1001,16 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
-// 🔥 修正：加入自動課程晉級邏輯
 async function startTraining() {
     isTraining = true;
     if (!aiModel) await initPPO();
 
-    // 切換 UI
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('game-layer').style.display = 'flex';
     document.getElementById('training-status-bar').style.display = 'block';
+
+    // 🔥 探索率：隨訓練次數增加而減少
+    let explorationRate = 0.5; 
 
     while (isTraining) {
         resetGameForTraining(curriculumLevel);
@@ -1024,8 +1025,13 @@ async function startTraining() {
             if (currentTurn === 'red') {
                 const state = getGameStateTensor();
                 const prediction = aiModel.predict(state);
-                const action = await prediction.data();
+                let action = await prediction.data(); // [index, angle, force]
                 
+                // 🔥 加入隨機探索雜訊，防止 AI 一直打同一個方向
+                if (Math.random() < explorationRate) {
+                    action = action.map(v => v + (Math.random() - 0.5) * 0.5);
+                }
+
                 await performAIAction(action);
                 
                 let reward = calculateReward();
@@ -1036,30 +1042,28 @@ async function startTraining() {
                 
                 state.dispose(); prediction.dispose(); target.dispose();
             } else {
-                // 非 AI 回合自動隨機移動
                 makeRandomPlayerMove();
             }
 
-            // 處理渲染速度
             if (document.getElementById('render-toggle').checked) {
                 await tf.nextFrame();
             }
         }
         
-        // 結算 Episode
         trainStats.episodes++;
         trainStats.rewards.push(episodeReward);
-        if (blueKills > redKills) trainStats.wins++; // 紅隊贏
+        if (blueKills > redKills) trainStats.wins++;
+        
+        // 隨著訓練次數增加，逐漸減少探索，穩定策略
+        explorationRate = Math.max(0.05, explorationRate * 0.995);
         
         updateTrainingUI();
         
-        // 晉級判斷：最近 10 場勝率超過 80% 則晉級
-        let recentWins = trainStats.rewards.slice(-10).length; // 這裡可依需求改為勝場判定
-        if (trainStats.episodes % 10 === 0 && (trainStats.wins / trainStats.episodes) > 0.8) {
+        if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.8 && trainStats.episodes > 10) {
             if (curriculumLevel < 4) {
                 curriculumLevel++;
                 showBigAnnouncement(`課程晉級：Level ${curriculumLevel}`, "#ffcc00");
-                trainStats.wins = 0; trainStats.episodes = 0; // 重置該階段統計
+                trainStats.wins = 0; trainStats.episodes = 0;
             }
         }
     }
