@@ -1078,17 +1078,6 @@ function resetGameForTraining(level) {
     }
 }
 
-function calculateReward() {
-    let r = 0;
-    // 擊中敵人給獎勵
-    r += currentActionDamage * 0.1;
-    // 擊殺敵人大獎勵
-    if (blueKills > lastBlueKills) r += 50;
-    // 自己扣血扣分
-    if (redKills < lastRedKills) r -= 30;
-    return r;
-}
-
 // 儲存模型到 LocalStorage
 async function saveAIModel() {
     if (aiModel) {
