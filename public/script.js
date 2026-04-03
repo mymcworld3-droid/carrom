@@ -1109,8 +1109,6 @@ function updateTrainingUI() {
     document.getElementById('curr-level').innerText = curriculumLevel;
     document.getElementById('train-episodes').innerText = trainStats.episodes;
     document.getElementById('win-rate').innerText = Math.round((trainStats.wins / trainStats.episodes) * 100) + "%";
-    const avg = trainStats.rewards.slice(-10).reduce((a, b) => a + b, 0) / 10;
-    document.getElementById('avg-reward').innerText = Math.round(avg);
 }
 
 function getPredictedCollision(attacker, dx, dy) {
