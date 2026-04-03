@@ -522,21 +522,30 @@ function resolveCollisions() {
     }
 }
 
-// 🔥 修改 checkTurnSystem (約第 430 行)
 function checkTurnSystem() {
     if (gameOver) return;
-
-    // 檢查是否有豹豹還在移動
     const movingLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
-    
-    // 🔥 核心修正：如果當前隊伍沒有可以行動的豹豹（全滅或動完），且目前沒在處理物理，強制進入處理狀態來觸發切換
     const canCurrentTeamMove = leopards.some(l => l.team === currentTurn && !l.hasMoved && !l.isDying);
+    
     if (!isProcessing && !isSlowMo && !canCurrentTeamMove) {
-        isProcessing = true; // 偽裝成動作結束，讓下方的邏輯接手切換
+        isProcessing = true;
     }
 
-    // 當處理中且物理完全停止，且沒在播放死亡慢動作時
     if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
+        // 🔥 關鍵邏輯：如果剛才是手動示範，且「真的有打到球」
+        if (isTraining && isManualDemo && pendingMemory) {
+            if (currentActionHits > 0) {
+                userMemories.push(pendingMemory);
+                const memBtn = document.getElementById('learn-memory-btn');
+                memBtn.style.display = 'inline-block';
+                memBtn.innerText = `🧠 學習紀錄 (${userMemories.length})`;
+                showBigAnnouncement("成功擊中！已存入紀錄", "gold");
+            } else {
+                showBigAnnouncement("揮空，不予紀錄", "#888");
+            }
+            pendingMemory = null;
+        }
+
         const wasMyTurn = (gameMode === 'online' && activeStriker && activeStriker.team === myTeam);
         isProcessing = false;
 
