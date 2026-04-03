@@ -945,50 +945,51 @@ function makeRandomPlayerMove() {
     isProcessing = true;
 }
 
-// 🔥 修正：依據課程階段設計專屬 Reward Function
 function calculateReward() {
     let r = 0;
     
     if (curriculumLevel === 1) {
-        // 第一階段獎勵：碰撞 +1.0, 留在場內 +0.5, 沒撞到 -0.1
-        if (currentActionDamage > 0) r += 1.0;
-        // 檢查 AI 是否還在場內 (假設 ID 1 是 AI)
-        let ai = leopards.find(l => l.id === 1);
-        if (ai && ai.x > 0 && ai.x < 800 && ai.y > 0 && ai.y < 600) r += 0.5;
-        if (currentActionDamage === 0) r -= 0.1;
+        // 第一階段：擊中目標是唯一目標
+        if (currentActionDamage > 0) {
+            r += 5.0; // 🔥 加大擊中獎勵，讓 AI 更有動力去撞目標
+        } else {
+            r -= 1.0; // 🔥 未命中則懲罰，防止它在角落混分
+        }
+        
+        // 修正：留在場內的獎勵大幅降低，避免 AI 變消極
+        let ai = leopards.find(l => l.team === 'red' && !l.isDying);
+        if (ai && ai.x > 50 && ai.x < 750 && ai.y > 50 && ai.y < 550) {
+            r += 0.1; 
+        }
     } 
     else if (curriculumLevel === 2) {
-        // 第二階段獎勵：撞牆命中 +2.0, 疊加反彈 +0.5
-        // 透過檢查 activeStriker 是否有 speedster 的攻擊加成判斷
+        // 第二階段：撞牆加成
         if (activeStriker && activeStriker.type === 'speedster' && currentActionDamage > 0) {
             let wallBounceCount = (activeStriker.atk - activeStriker.baseAtk) / 10;
-            if (wallBounceCount > 0) {
-                r += 2.0 + (wallBounceCount * 0.5);
-            }
+            r += (wallBounceCount > 0) ? (2.0 + wallBounceCount * 1.0) : 0.5;
+        } else if (currentActionDamage === 0) {
+            r -= 0.5;
         }
     } 
     else if (curriculumLevel === 3) {
-        // 第三階段獎勵：戰吼增益 +1.5, 刺客擊殺 +3.0, 刺客死亡 -2.0
-        // 檢查戰吼增益 (簡化判定：紅隊攻擊力是否有提升)
+        // 第三階段：英雄協作
         leopards.filter(l => l.team === 'red').forEach(l => {
-            if (l.atk > l.baseAtk && l.type !== 'speedster') r += 1.5;
+            if (l.atk > l.baseAtk && l.type !== 'speedster') r += 2.0;
         });
-        if (blueKills > lastBlueKills) r += 3.0; // 紅隊擊殺敵人
+        if (blueKills > lastBlueKills) r += 5.0;
         let assassin = leopards.find(l => l.type === 'assassin' && l.team === 'red');
-        if (!assassin || assassin.isDying) r -= 2.0;
+        if (!assassin || assassin.isDying) r -= 5.0; // 加重刺客死亡懲罰
     } 
     else {
-        // 第四階段獎勵：傷害/10, 擊殺 +10, 死亡 -5, 勝利 +50
-        r += (currentActionDamage / 10);
-        if (blueKills > lastBlueKills) r += 10;
-        if (redKills > lastRedKills) r -= 5;
-        if (blueKills >= 5) r += 50; // 贏得比賽
+        // 第四階段：實戰
+        r += (currentActionDamage / 5);
+        if (blueKills > lastBlueKills) r += 15;
+        if (redKills > lastRedKills) r -= 10;
+        if (blueKills >= 5) r += 100;
     }
 
-    // 更新上一次的擊殺紀錄，供下次比對
     lastBlueKills = blueKills;
     lastRedKills = redKills;
-    
     return r;
 }
 
