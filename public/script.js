@@ -1285,12 +1285,29 @@ function getPointerPos(e) {
 
 function handleStart(e) {
     if (isProcessing || gameOver) return;
+    // 訓練模式下，只有開啟 isManualDemo 才能手動操作
+    if (isTraining && !isManualDemo) return; 
     if (gameMode === 'online' && currentTurn !== myTeam) return;
+
     const pos = getPointerPos(e);
     leopards.forEach(l => {
         if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
             let dist = Math.sqrt((pos.x - l.x)**2 + (pos.y - l.y)**2);
-            if (dist < l.radius * 1.5) { selectedLeopard = l; isDragging = true; dragEndPos = { x: pos.x, y: pos.y }; }
+            if (dist < l.radius * 1.5) { 
+                selectedLeopard = l; 
+                isDragging = true; 
+                dragEndPos = { x: pos.x, y: pos.y };
+
+                // 錄製狀態：抓取點擊瞬間的戰場畫面
+                if (isTraining && isManualDemo) {
+                    const stateTensor = getGameStateTensor();
+                    pendingMemory = {
+                        state: stateTensor.arraySync()[0],
+                        attackerId: l.id
+                    };
+                    stateTensor.dispose();
+                }
+            }
         }
     });
     if (isDragging && e.cancelable) e.preventDefault();
