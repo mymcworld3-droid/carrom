@@ -952,7 +952,6 @@ async function performAIAction(action) {
     isProcessing = true;
 }
 
-// 🔥 缺失函式：訓練期間藍隊（對手）的隨機動作邏輯
 function makeRandomPlayerMove() {
     if (gameOver || isProcessing) return;
     const pLeopards = leopards.filter(l => l.team === 'blue' && !l.hasMoved && !l.isDying);
@@ -962,6 +961,7 @@ function makeRandomPlayerMove() {
     const angle = Math.random() * Math.PI * 2;
     const force = 40 + Math.random() * 80;
 
+    currentActionHits = 0; // 🔥 重置計數
     attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
     attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
     attacker.hasMoved = true;
