@@ -832,6 +832,36 @@ let isManualDemo = false;
 let userMemories = []; // 存放高手操作精華
 let pendingMemory = null; // 暫存目前的動作，等物理跑完看有沒有打到
 
+// 🔥 新增：讓 AI 學習剛剛錄製的高手動作
+async function trainFromUserMemories() {
+    if (userMemories.length === 0) return;
+    
+    isManualDemo = false;
+    document.getElementById('manual-demo-btn').innerText = "🎮 開啟手動示範";
+    document.getElementById('manual-demo-btn').style.background = "#4ecca3";
+    
+    showBigAnnouncement(`正在學習 ${userMemories.length} 筆高手紀錄...`, "#3498db");
+
+    // 將記憶轉換為 Tensor 進行批次訓練
+    const states = tf.tensor2d(userMemories.map(m => m.state));
+    const actions = tf.tensor2d(userMemories.map(m => m.action));
+
+    await aiModel.fit(states, actions, {
+        epochs: 10, // 對高手紀錄重複練習 10 次
+        shuffle: true,
+        callbacks: {
+            onEpochEnd: (epoch, logs) => console.log(`學習進度: ${epoch+1}/10, 誤差: ${logs.loss.toFixed(4)}`)
+        }
+    });
+
+    states.dispose();
+    actions.dispose();
+    
+    showBigAnnouncement("特訓完成！AI 已吸收你的風格", "gold");
+    userMemories = []; // 清空，避免重複訓練
+    document.getElementById('learn-memory-btn').style.display = 'none';
+}
+
 // 🔥 新增：切換手動示範
 function toggleManualDemo() {
     isManualDemo = !isManualDemo;
