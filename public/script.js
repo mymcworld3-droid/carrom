@@ -1036,28 +1036,45 @@ async function startTraining() {
     }
 }
 
-// 🔥 修正後的 resetGameForTraining：確保追蹤變數重置
+// 🔥 修正：依據四個課程階段初始化戰場環境
 function resetGameForTraining(level) {
     gameOver = false;
-    blueKills = 0;
-    redKills = 0;
-    lastBlueKills = 0;
-    lastRedKills = 0;
-    roundCount = 1;
-    currentTurn = 'blue';
+    blueKills = 0; redKills = 0;
+    lastBlueKills = 0; lastRedKills = 0;
+    roundCount = 1; currentTurn = 'red'; // 訓練時讓 AI (紅隊) 先攻
     isProcessing = false;
     
-    blueTeamConfig = ['balanced', 'balanced', 'balanced'];
-    redTeamConfig = ['assassin', 'speedster', 'tank'];
-    initGame();
-    
+    // 清空現有豹豹
+    leopards = [];
+
     if (level === 1) {
-        // 等級 1：藍隊豹豹極脆且不動
-        leopards.filter(l => l.team === 'blue').forEach(l => { 
-            l.hp = 15; 
-            l.maxHp = 15; 
-        });
+        // 第一階段：1隻全能豹 vs 1個不動木靶 (位於中心)
+        leopards.push(new Leopard(400, 500, 25, '#e74c3c', 'red', 1, 'balanced')); // AI
+        let target = new Leopard(400, 200, 35, '#3498db', 'blue', 2, 'tank'); // 木靶
+        target.hp = 999; target.maxHp = 999; // 極高 HP
+        leopards.push(target);
+    } 
+    else if (level === 2) {
+        // 第二階段：1隻疾風豹 (加強牆壁反彈練習)
+        leopards.push(new Leopard(150, 500, 25, '#e74c3c', 'red', 1, 'speedster'));
+        leopards.push(new Leopard(650, 150, 30, '#3498db', 'blue', 2, 'balanced'));
+    } 
+    else if (level === 3) {
+        // 第三階段：戰吼豹 + 刺客豹 (隊友協作練習)
+        leopards.push(new Leopard(300, 500, 25, '#e74c3c', 'red', 1, 'support'));
+        leopards.push(new Leopard(500, 500, 25, '#e74c3c', 'red', 2, 'assassin'));
+        // 敵人放兩隻普通的
+        leopards.push(new Leopard(400, 150, 25, '#3498db', 'blue', 3, 'balanced'));
+        leopards.push(new Leopard(600, 200, 25, '#3498db', 'blue', 4, 'balanced'));
+    } 
+    else {
+        // 第四階段：完整 3v3 實戰
+        blueTeamConfig = ['balanced', 'tank', 'assassin'];
+        redTeamConfig = ['support', 'speedster', 'assassin'];
+        initGame(); // 使用原本的 3v3 初始化邏輯
     }
+    
+    updateExternalUI(); // 更新介面點點
 }
 
 // 🔥 修改 saveAIModel：同時儲存到瀏覽器並下載檔案以便上傳 GitHub
