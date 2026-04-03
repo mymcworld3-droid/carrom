@@ -1032,7 +1032,6 @@ async function startTraining() {
     document.getElementById('game-layer').style.display = 'flex';
     document.getElementById('training-status-bar').style.display = 'block';
 
-    // 🔥 探索率：隨訓練次數增加而減少
     let explorationRate = 0.5; 
 
     while (isTraining) {
@@ -1040,17 +1039,17 @@ async function startTraining() {
         let episodeReward = 0;
         
         while (!gameOver && isTraining) {
+            // 🔥 修正：物理等待時間隨 trainingSpeed 縮減
             if (isProcessing) {
-                await new Promise(r => setTimeout(r, 50));
+                await new Promise(r => setTimeout(r, 50 / trainingSpeed));
                 continue;
             }
 
             if (currentTurn === 'red') {
                 const state = getGameStateTensor();
                 const prediction = aiModel.predict(state);
-                let action = await prediction.data(); // [index, angle, force]
+                let action = await prediction.data();
                 
-                // 🔥 加入隨機探索雜訊，防止 AI 一直打同一個方向
                 if (Math.random() < explorationRate) {
                     action = action.map(v => v + (Math.random() - 0.5) * 0.5);
                 }
@@ -1068,6 +1067,7 @@ async function startTraining() {
                 makeRandomPlayerMove();
             }
 
+            // 如果有渲染，也要讓出執行緒以免瀏覽器當機
             if (document.getElementById('render-toggle').checked) {
                 await tf.nextFrame();
             }
@@ -1077,11 +1077,10 @@ async function startTraining() {
         trainStats.rewards.push(episodeReward);
         if (blueKills > redKills) trainStats.wins++;
         
-        // 隨著訓練次數增加，逐漸減少探索，穩定策略
         explorationRate = Math.max(0.05, explorationRate * 0.995);
-        
         updateTrainingUI();
         
+        // 晉級判斷
         if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.8 && trainStats.episodes > 10) {
             if (curriculumLevel < 4) {
                 curriculumLevel++;
