@@ -836,6 +836,12 @@ let trainRender = true;
 let aiModel = null;
 let curriculumLevel = 1; // 1: 打死固定目標, 2: 打死隨機目標, 3: 對戰弱 AI, 4: 完全體對戰
 let trainStats = { episodes: 0, wins: 0, rewards: [] };
+let trainingSpeed = 1;
+
+function updateSpeedDisplay(val) {
+    trainingSpeed = parseInt(val);
+    document.getElementById('speed-val').innerText = val + 'x';
+}
 
 // 🔥 修改 initPPO：支援從本地或 GitHub (URL) 載入 AI 模型
 async function initPPO() {
