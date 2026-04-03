@@ -828,9 +828,6 @@ let aiModel = null;
 let curriculumLevel = 1; // 1: 打死固定目標, 2: 打死隨機目標, 3: 對戰弱 AI, 4: 完全體對戰
 let trainStats = { episodes: 0, wins: 0, rewards: [] };
 let trainingSpeed = 1;
-let isManualDemo = false;
-let userMemories = []; // 存放高手操作精華
-let pendingMemory = null; // 暫存目前的動作，等物理跑完看有沒有打到
 
 // 🔥 新增：讓 AI 學習剛剛錄製的高手動作
 async function trainFromUserMemories() {
