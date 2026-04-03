@@ -1001,23 +1001,23 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
+// 🔥 修正：加入自動課程晉級邏輯
 async function startTraining() {
     isTraining = true;
-    gameMode = 'single';
+    if (!aiModel) await initPPO();
+
+    // 切換 UI
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('game-layer').style.display = 'flex';
     document.getElementById('training-status-bar').style.display = 'block';
-    
-    if (!aiModel) await initPPO();
 
     while (isTraining) {
         resetGameForTraining(curriculumLevel);
         let episodeReward = 0;
         
         while (!gameOver && isTraining) {
-            // 🔥 核心修正：如果物理還在跑，就原地等待，不要進入邏輯判斷
             if (isProcessing) {
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, 50));
                 continue;
             }
 
@@ -1036,25 +1036,30 @@ async function startTraining() {
                 
                 state.dispose(); prediction.dispose(); target.dispose();
             } else {
-                // 藍隊行動後，同樣會觸發 isProcessing = true
+                // 非 AI 回合自動隨機移動
                 makeRandomPlayerMove();
             }
 
-            // 根據渲染開關決定等待時間
+            // 處理渲染速度
             if (document.getElementById('render-toggle').checked) {
-                await tf.nextFrame(); // 讓瀏覽器有喘息空間更新 UI
+                await tf.nextFrame();
             }
         }
         
+        // 結算 Episode
         trainStats.episodes++;
         trainStats.rewards.push(episodeReward);
-        if (redKills >= 5) trainStats.wins++;
+        if (blueKills > redKills) trainStats.wins++; // 紅隊贏
+        
         updateTrainingUI();
         
-        if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.75 && trainStats.episodes > 10) {
+        // 晉級判斷：最近 10 場勝率超過 80% 則晉級
+        let recentWins = trainStats.rewards.slice(-10).length; // 這裡可依需求改為勝場判定
+        if (trainStats.episodes % 10 === 0 && (trainStats.wins / trainStats.episodes) > 0.8) {
             if (curriculumLevel < 4) {
                 curriculumLevel++;
-                showBigAnnouncement(`課程晉級！目前等級: ${curriculumLevel}`, "#ffcc00");
+                showBigAnnouncement(`課程晉級：Level ${curriculumLevel}`, "#ffcc00");
+                trainStats.wins = 0; trainStats.episodes = 0; // 重置該階段統計
             }
         }
     }
