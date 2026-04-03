@@ -945,26 +945,50 @@ function makeRandomPlayerMove() {
     isProcessing = true;
 }
 
-// 🔥 修正後的 calculateReward：正確更新 lastKills 並計算獎勵
+// 🔥 修正：依據課程階段設計專屬 Reward Function
 function calculateReward() {
     let r = 0;
-    // 造成傷害獎勵
-    r += currentActionDamage * 0.15;
     
-    // 擊殺敵人大獎勵
-    if (blueKills > lastBlueKills) {
-        r += 80;
-        lastBlueKills = blueKills;
+    if (curriculumLevel === 1) {
+        // 第一階段獎勵：碰撞 +1.0, 留在場內 +0.5, 沒撞到 -0.1
+        if (currentActionDamage > 0) r += 1.0;
+        // 檢查 AI 是否還在場內 (假設 ID 1 是 AI)
+        let ai = leopards.find(l => l.id === 1);
+        if (ai && ai.x > 0 && ai.x < 800 && ai.y > 0 && ai.y < 600) r += 0.5;
+        if (currentActionDamage === 0) r -= 0.1;
+    } 
+    else if (curriculumLevel === 2) {
+        // 第二階段獎勵：撞牆命中 +2.0, 疊加反彈 +0.5
+        // 透過檢查 activeStriker 是否有 speedster 的攻擊加成判斷
+        if (activeStriker && activeStriker.type === 'speedster' && currentActionDamage > 0) {
+            let wallBounceCount = (activeStriker.atk - activeStriker.baseAtk) / 10;
+            if (wallBounceCount > 0) {
+                r += 2.0 + (wallBounceCount * 0.5);
+            }
+        }
+    } 
+    else if (curriculumLevel === 3) {
+        // 第三階段獎勵：戰吼增益 +1.5, 刺客擊殺 +3.0, 刺客死亡 -2.0
+        // 檢查戰吼增益 (簡化判定：紅隊攻擊力是否有提升)
+        leopards.filter(l => l.team === 'red').forEach(l => {
+            if (l.atk > l.baseAtk && l.type !== 'speedster') r += 1.5;
+        });
+        if (blueKills > lastBlueKills) r += 3.0; // 紅隊擊殺敵人
+        let assassin = leopards.find(l => l.type === 'assassin' && l.team === 'red');
+        if (!assassin || assassin.isDying) r -= 2.0;
+    } 
+    else {
+        // 第四階段獎勵：傷害/10, 擊殺 +10, 死亡 -5, 勝利 +50
+        r += (currentActionDamage / 10);
+        if (blueKills > lastBlueKills) r += 10;
+        if (redKills > lastRedKills) r -= 5;
+        if (blueKills >= 5) r += 50; // 贏得比賽
     }
+
+    // 更新上一次的擊殺紀錄，供下次比對
+    lastBlueKills = blueKills;
+    lastRedKills = redKills;
     
-    // 我方被擊殺重罰
-    if (redKills > lastRedKills) {
-        r -= 60;
-        lastRedKills = redKills;
-    }
-    
-    // 每回合微量扣分，鼓勵 AI 追求效率
-    r -= 0.2;
     return r;
 }
 
