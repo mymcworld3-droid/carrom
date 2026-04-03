@@ -1102,7 +1102,7 @@ async function saveAIModel() {
 }
 
 function toggleTrainingUI() {
-    const ui = document.getElementById('training-ui');
+    const ui = document.getElementById('training-status-bar');
     if (ui.style.display === 'none') {
         startTraining();
     } else {
