@@ -973,19 +973,19 @@ function calculateReward() {
     let r = 0;
     
     if (curriculumLevel === 1) {
-        // 第一階段：擊中目標是唯一目標
-        if (currentActionDamage > 0) {
-            r += 5.0; // 🔥 加大擊中獎勵，讓 AI 更有動力去撞目標
+        // 第一階段：鼓勵連續碰撞
+        if (currentActionHits > 0) {
+            // 基本獎勵 + (碰撞次數的平方)，次數越多獎勵呈指數成長
+            r += (currentActionHits * 5.0) + Math.pow(currentActionHits, 2) * 2; 
         } else {
-            r -= 1.0; // 🔥 未命中則懲罰，防止它在角落混分
+            r -= 2.0; // 未命中的懲罰稍微加重
         }
         
-        // 修正：留在場內的獎勵大幅降低，避免 AI 變消極
         let ai = leopards.find(l => l.team === 'red' && !l.isDying);
         if (ai && ai.x > 50 && ai.x < 750 && ai.y > 50 && ai.y < 550) {
             r += 0.1; 
         }
-    } 
+    }
     else if (curriculumLevel === 2) {
         // 第二階段：撞牆加成
         if (activeStriker && activeStriker.type === 'speedster' && currentActionDamage > 0) {
