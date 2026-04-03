@@ -1102,7 +1102,7 @@ function toggleTrainingUI() {
 
 function stopTraining() {
     isTraining = false;
-    document.getElementById('training-ui').style.display = 'none';
+    document.getElementById('training-status-bar').style.display = 'none';
 }
 
 function updateTrainingUI() {
