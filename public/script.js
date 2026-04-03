@@ -1423,7 +1423,8 @@ function gameLoop() {
         }
     }
 
-    leopards.forEach(l => { l.update(); l.draw(); });
+    leopards.forEach(l => l.draw()); // 繪圖維持一次
+    runPhysicsSteps(steps); // 物理更新多次
     for (let i = particles.length - 1; i >= 0; i--) {
         particles[i].update(); particles[i].draw();
         if (particles[i].life <= 0) particles.splice(i, 1);
