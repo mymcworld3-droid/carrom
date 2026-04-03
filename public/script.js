@@ -870,14 +870,21 @@ async function initPPO() {
     }
 }
 
-// 獲取環境狀態 (Observation)
 function getGameStateTensor() {
     let state = [];
+    const myLeopard = leopards.find(l => l.team === 'red' && !l.isDying) || leopards[0];
+    
     leopards.forEach(l => {
-        state.push(l.x / 800, l.y / 600, l.hp / 150, l.team === 'blue' ? 1 : 0);
+        // 1. 座標與 HP 基礎資訊
+        state.push(l.x / 800, l.y / 600, l.hp / 150, l.team === 'red' ? 1 : 0);
+        
+        // 🔥 2. 加入相對位置資訊 (幫助神經網路快速理解空間關係)
+        state.push((l.x - myLeopard.x) / 800);
+        state.push((l.y - myLeopard.y) / 600);
     });
-    // 補齊到 24 個特徵 (若豹豹死亡則補 0)
-    while(state.length < 24) state.push(0);
+    
+    // 確保維度固定，若豹豹不足則補零
+    while(state.length < 48) state.push(0); // 增加維度到 48
     return tf.tensor2d([state]);
 }
 
