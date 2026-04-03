@@ -879,6 +879,15 @@ function getGameStateTensor() {
     return tf.tensor2d([state]);
 }
 
+// 🔥 物理引擎加速執行函式
+function runPhysicsSteps(count) {
+    for (let i = 0; i < count; i++) {
+        leopards.forEach(l => l.update());
+        resolveCollisions();
+        checkTurnSystem();
+    }
+}
+
 // 1. 修正 makeAIMove 增加 async
 async function makeAIMove() {
     if (gameOver || isProcessing) return;
