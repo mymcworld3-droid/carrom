@@ -1388,13 +1388,14 @@ function showBigAnnouncement(text, color = "white") {
 }
 
 function gameLoop() {
-    // 🔥 修改：即便不渲染，也要更新慢動作計時器，否則回合系統會卡死
     updateCameraAndSlowMo();
 
+    // 🔥 修改：根據 trainingSpeed 決定物理更新頻率
+    // 如果在訓練中，物理更新次數 = trainingSpeed，否則 = 1
+    const steps = isTraining ? trainingSpeed : 1;
+
     if (isTraining && !trainRender) {
-        // 在不渲染模式下，我們手動觸發物理邏輯以維持系統運作
-        resolveCollisions();
-        checkTurnSystem();
+        runPhysicsSteps(steps);
         requestAnimationFrame(gameLoop);
         return; 
     }
