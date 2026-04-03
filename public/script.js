@@ -948,26 +948,26 @@ function makeRandomPlayerMove() {
     isProcessing = true;
 }
 
-// 4. 修正獎勵計算與狀態追蹤
+// 🔥 修正後的 calculateReward：正確更新 lastKills 並計算獎勵
 function calculateReward() {
     let r = 0;
-    // 擊中敵人給獎勵 (currentActionDamage 來自 resolveCollisions)
-    r += currentActionDamage * 0.1;
+    // 造成傷害獎勵
+    r += currentActionDamage * 0.15;
     
     // 擊殺敵人大獎勵
     if (blueKills > lastBlueKills) {
-        r += 50;
+        r += 80;
         lastBlueKills = blueKills;
     }
     
-    // 自己被擊殺扣分
+    // 我方被擊殺重罰
     if (redKills > lastRedKills) {
-        r -= 30;
+        r -= 60;
         lastRedKills = redKills;
     }
     
-    // 每一輪給予極小的負分，鼓勵 AI 儘快結束戰鬥
-    r -= 0.1; 
+    // 每回合微量扣分，鼓勵 AI 追求效率
+    r -= 0.2;
     return r;
 }
 
