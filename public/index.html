@@ -34,6 +34,9 @@
         課程等級: <span id="curr-level">1</span> | 
         回合: <span id="train-episodes">0</span> | 
         勝率: <span id="win-rate">0%</span> | 
+        <span style="margin-left: 15px;">速度: </span>
+        <input type="range" id="speed-slider" min="1" max="20" value="1" step="1" oninput="updateSpeedDisplay(this.value)" style="vertical-align: middle; width: 80px;">
+        <span id="speed-val" style="color: #ffcc00; font-weight: bold; margin-left: 5px;">1x</span>|
         <label style="cursor: pointer; margin-left: 15px;"><input type="checkbox" id="render-toggle" checked> 顯示畫面</label>
         <button onclick="saveAIModel()" style="margin-left: 15px; background: #ffcc00; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: bold;">💾 匯出模型</button>
         <button onclick="stopTraining()" style="margin-left: 10px; background: #ff4444; color: white; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer;">停止</button>
