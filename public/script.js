@@ -1086,7 +1086,7 @@ async function startTraining() {
         trainStats.rewards.push(episodeReward);
         if (blueKills > redKills) trainStats.wins++;
         
-        explorationRate = Math.max(0.05, explorationRate * 0.995);
+        explorationRate = Math.max(0.05, explorationRate * 0.998);
         updateTrainingUI();
         
         // 晉級判斷
