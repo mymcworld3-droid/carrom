@@ -522,30 +522,35 @@ function resolveCollisions() {
     }
 }
 
-// 🔥 修復後的回合管理系統：將疾風豹的重置時機延後至整輪(Round)結束
+// 🔥 修改 checkTurnSystem (約第 430 行)
 function checkTurnSystem() {
     if (gameOver) return;
 
     // 檢查是否有豹豹還在移動
     const movingLeopards = leopards.filter(l => !l.isDying && (Math.abs(l.vx) > 0.05 || Math.abs(l.vy) > 0.05));
     
+    // 🔥 核心修正：如果當前隊伍沒有可以行動的豹豹（全滅或動完），且目前沒在處理物理，強制進入處理狀態來觸發切換
+    const canCurrentTeamMove = leopards.some(l => l.team === currentTurn && !l.hasMoved && !l.isDying);
+    if (!isProcessing && !isSlowMo && !canCurrentTeamMove) {
+        isProcessing = true; // 偽裝成動作結束，讓下方的邏輯接手切換
+    }
+
     // 當處理中且物理完全停止，且沒在播放死亡慢動作時
     if (isProcessing && movingLeopards.length === 0 && !isSlowMo) {
-        // 先暫存目前是誰發動的彈射
         const wasMyTurn = (gameMode === 'online' && activeStriker && activeStriker.team === myTeam);
-        
         isProcessing = false;
 
         // 1. 處理重生與增益清理
         leopards.forEach(l => { 
             l.buffedThisTurn = false;
-            // 🔥 這裡移除了原本每回合重置疾風豹的邏輯，改至下方的 Round 結算處
             if (l.isDying) respawnLeopard(l); 
         });
 
         // 2. 切換回合邏輯：直到找到一個有豹豹可以動的隊伍
         let turnSwitched = false;
-        while (!turnSwitched) {
+        let attempt = 0;
+        while (!turnSwitched && attempt < 5) { // 增加安全計數防止死循環
+            attempt++;
             const otherTeam = currentTurn === 'blue' ? 'red' : 'blue';
             const otherCanMove = leopards.some(l => l.team === otherTeam && !l.hasMoved);
 
@@ -555,59 +560,34 @@ function checkTurnSystem() {
             } else {
                 const currentCanMove = leopards.some(l => l.team === currentTurn && !l.hasMoved);
                 if (!currentCanMove) {
-                    // 兩邊都沒動作了，重置輪數（一整回合結束）
                     roundCount++;
-                    
-                    // 🔥 疾風豹能力重置：只有在一整輪(Round)結束後才重置攻擊力
-                    leopards.forEach(l => {
-                        if (l.type === 'speedster') {
-                            l.atk = l.baseAtk;
-                        }
-                    });
-
+                    leopards.forEach(l => { if (l.type === 'speedster') l.atk = l.baseAtk; });
                     firstTeam = (roundCount % 2 === 1) ? 'blue' : 'red';
                     currentTurn = firstTeam;
                     leopards.forEach(l => l.hasMoved = false);
-                    turnSwitched = true; // 重置後一定有人能動
+                    turnSwitched = true; 
                 } else {
-                    // 當前隊伍還有剩餘行動次數，繼續輪到他（例如對手全滅或已動完）
                     turnSwitched = true; 
                 }
             }
         }
 
-        // 3. UI 提示
         const teamColor = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
         const teamName = currentTurn === 'blue' ? '藍隊' : '紅隊';
         const statusText = currentTurn === firstTeam ? '先手' : '後手';
         showBigAnnouncement(`${teamName} 行動\n(${statusText})`, teamColor);
 
-        // 🔥 修改 syncState 的資料結構
-        if (wasMyTurn) {
+        if (wasMyTurn && gameMode === 'online') {
             socket.emit('syncState', {
                 roomId: currentRoomId, 
-                leopards: leopards.map(l => ({ 
-                    id: l.id, 
-                    x: l.x, 
-                    y: l.y, 
-                    hp: l.hp, 
-                    atk: l.atk,
-                    isDying: l.isDying, // 🔥 新增同步死亡狀態
-                    hasMoved: l.hasMoved // 🔥 新增同步行動標記
-                })),
-                blueKills,
-                redKills,
-                totalDamage: totalDamageDealt,
-                round: roundCount,
-                firstTeam: firstTeam,
-                nextTurn: currentTurn
+                leopards: leopards.map(l => ({ id: l.id, x: l.x, y: l.y, hp: l.hp, atk: l.atk, isDying: l.isDying, hasMoved: l.hasMoved })),
+                blueKills, redKills, totalDamage: totalDamageDealt, round: roundCount, firstTeam: firstTeam, nextTurn: currentTurn
             });
         }
 
-        activeStriker = null; // 同步發送後才清理
-
-        if (gameMode === 'single' && currentTurn === 'red') {
-            setTimeout(makeAIMove, 1500);
+        activeStriker = null;
+        if (gameMode === 'single' && currentTurn === 'red' && !isTraining) {
+            setTimeout(makeAIMove, 1000);
         }
 
         actionDamageEl.style.opacity = '0';
