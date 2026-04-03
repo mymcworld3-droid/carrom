@@ -1025,22 +1025,21 @@ async function startTraining() {
         resetGameForTraining(curriculumLevel);
         let episodeReward = 0;
         
+        // 在 startTraining 內部的 while 迴圈中
         while (!gameOver && isTraining) {
+            // 如果物理還在跑，就一直等，直到 checkTurnSystem 把 isProcessing 設為 false
             if (isProcessing) {
-                // 增加等待時間，確保 gameLoop 有機會運行物理
-                await new Promise(r => setTimeout(r, 20)); 
+                await new Promise(r => setTimeout(r, 30)); 
                 continue;
             }
-
+        
             if (currentTurn === 'red') {
+                // AI 思考並執行
                 const state = getGameStateTensor();
                 const prediction = aiModel.predict(state);
                 let action = await prediction.data();
                 
-                if (Math.random() < explorationRate) {
-                    action = action.map(v => v + (Math.random() - 0.5) * 0.5);
-                }
-
+                // 執行動作 (這會把 isProcessing 設為 true)
                 await performAIAction(action);
                 
                 let reward = calculateReward();
