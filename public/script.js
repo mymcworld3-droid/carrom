@@ -867,35 +867,30 @@ function getGameStateTensor() {
     return tf.tensor2d([state]);
 }
 
-function makeAIMove() {
+// 1. 修正 makeAIMove 增加 async
+async function makeAIMove() {
     if (gameOver || isProcessing) return;
-    // 如果有訓練好的模型，優先使用模型
+    
+    // 如果有訓練好的模型且是單人模式，優先使用模型
     if (aiModel && gameMode === 'single') {
         const state = getGameStateTensor();
         const prediction = aiModel.predict(state);
-        const [targetIdx, angleNorm, forceNorm] = await prediction.data();
+        const action = await prediction.data();
         
-        // 解析動作
-        const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
-        if (myLeopards.length === 0) return;
+        await performAIAction(action); // 使用統一的動作執行函式
         
-        const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
-        const angle = angleNorm * Math.PI; // -PI ~ PI
-        const force = (forceNorm + 1) * 0.5 * MAX_DRAG; // 0 ~ MAX_DRAG
-
-        attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
-        attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
-        attacker.hasMoved = true; 
-        isProcessing = true;
         state.dispose();
         prediction.dispose();
         return;
     }
+
+    // 原有的隨機 AI 邏輯
     const aiLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
     if (aiLeopards.length === 0) return;
     const attacker = aiLeopards[Math.floor(Math.random() * aiLeopards.length)];
     const enemies = leopards.filter(l => l.team === 'blue' && !l.isDying);
     if (enemies.length === 0) return;
+
     let closestEnemy = enemies[0];
     let minDist = Infinity;
     enemies.forEach(e => {
@@ -908,7 +903,8 @@ function makeAIMove() {
     const force = Math.min(minDist * 0.4, MAX_DRAG);
     attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
     attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
-    attacker.hasMoved = true; isProcessing = true;
+    attacker.hasMoved = true; 
+    isProcessing = true;
 }
 
 async function startTraining() {
