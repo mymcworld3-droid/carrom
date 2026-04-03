@@ -1013,6 +1013,7 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
+// 🔥 修改 startTraining 中的循環 (約第 615 行)
 async function startTraining() {
     isTraining = true;
     if (!aiModel) await initPPO();
@@ -1028,9 +1029,9 @@ async function startTraining() {
         let episodeReward = 0;
         
         while (!gameOver && isTraining) {
-            // 🔥 修正：物理等待時間隨 trainingSpeed 縮減
             if (isProcessing) {
-                await new Promise(r => setTimeout(r, 50 / trainingSpeed));
+                // 增加等待時間，確保 gameLoop 有機會運行物理
+                await new Promise(r => setTimeout(r, 20)); 
                 continue;
             }
 
@@ -1056,9 +1057,11 @@ async function startTraining() {
                 makeRandomPlayerMove();
             }
 
-            // 如果有渲染，也要讓出執行緒以免瀏覽器當機
+            // 🔥 關鍵：無論是否顯示畫面，都必須強制 yield 執行緒，讓物理引擎 (gameLoop) 跑回合判定
             if (document.getElementById('render-toggle').checked) {
                 await tf.nextFrame();
+            } else {
+                await new Promise(r => setTimeout(r, 1)); // 非渲染模式下給予極短暫停防止瀏覽器凍結
             }
         }
         
