@@ -1326,7 +1326,6 @@ function handleEnd(e) {
     let dy = selectedLeopard.y - dragEndPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // 🔥 將判定門檻從 5 提高到 15，讓玩家移回中心放開時能成功取消
     if (dist > 15) {
         if (dist > MAX_DRAG) {
             const ratio = MAX_DRAG / dist;
@@ -1336,28 +1335,25 @@ function handleEnd(e) {
         let vx = dx * LAUNCH_FORCE_MULT;
         let vy = dy * LAUNCH_FORCE_MULT;
 
-        // 🔥 疾風豹能力：彈射速度增加 50%
-        if (selectedLeopard.type === 'speedster') {
-            vx *= 1.5;
-            vy *= 1.5;
+        if (selectedLeopard.type === 'speedster') { vx *= 1.5; vy *= 1.5; }
+
+        // 錄製動作：將向量轉回 AI 能理解的 normalized 數值
+        if (isTraining && isManualDemo && pendingMemory) {
+            const angle = Math.atan2(dy, dx) / Math.PI;
+            const force = (dist / MAX_DRAG) * 2 - 1; // 轉回 -1 ~ 1 區間
+            pendingMemory.action = [0, angle, force]; // 這裡簡化 targetIdx 為 0
         }
 
-        // 尋找 handleEnd 函式內的 socket.emit 部分
         if (gameMode === 'online') {
-            socket.emit('playerMove', { 
-                roomId: currentRoomId, // 必須夾帶 roomId
-                id: selectedLeopard.id, 
-                vx, 
-                vy 
-            });
+            socket.emit('playerMove', { roomId: currentRoomId, id: selectedLeopard.id, vx, vy });
         }
 
-        // 記錄主動彈射者
         activeStriker = selectedLeopard; 
         selectedLeopard.vx = vx;
         selectedLeopard.vy = vy;
         selectedLeopard.hasMoved = true;
         isProcessing = true;
+        currentActionHits = 0; // 重置碰撞計數
     }
 
     isDragging = false;
