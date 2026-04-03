@@ -989,11 +989,8 @@ window.enterSelection = async function(mode) {
 async function startTraining() {
     isTraining = true;
     gameMode = 'single';
-    
-    // 切換 UI，隱藏選單並顯示遊戲圖層與訓練狀態列
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('game-layer').style.display = 'flex';
-    // 🔥 修正 ID 為 training-status-bar
     document.getElementById('training-status-bar').style.display = 'block';
     
     if (!aiModel) await initPPO();
@@ -1003,6 +1000,12 @@ async function startTraining() {
         let episodeReward = 0;
         
         while (!gameOver && isTraining) {
+            // 🔥 核心修正：如果物理還在跑，就原地等待，不要進入邏輯判斷
+            if (isProcessing) {
+                await new Promise(r => setTimeout(r, 100));
+                continue;
+            }
+
             if (currentTurn === 'red') {
                 const state = getGameStateTensor();
                 const prediction = aiModel.predict(state);
@@ -1016,29 +1019,21 @@ async function startTraining() {
                 const target = tf.tensor2d([action]);
                 await aiModel.fit(state, target, {epochs: 1, verbose: 0});
                 
-                state.dispose();
-                prediction.dispose();
-                target.dispose();
+                state.dispose(); prediction.dispose(); target.dispose();
             } else {
+                // 藍隊行動後，同樣會觸發 isProcessing = true
                 makeRandomPlayerMove();
             }
 
-            trainRender = document.getElementById('render-toggle').checked;
-            if (trainRender) {
-                await new Promise(r => setTimeout(r, 50)); 
-            } else {
-                for(let i=0; i<8; i++) {
-                    leopards.forEach(l => l.update());
-                    resolveCollisions();
-                    checkTurnSystem();
-                }
+            // 根據渲染開關決定等待時間
+            if (document.getElementById('render-toggle').checked) {
+                await tf.nextFrame(); // 讓瀏覽器有喘息空間更新 UI
             }
         }
         
         trainStats.episodes++;
         trainStats.rewards.push(episodeReward);
         if (redKills >= 5) trainStats.wins++;
-        
         updateTrainingUI();
         
         if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.75 && trainStats.episodes > 10) {
