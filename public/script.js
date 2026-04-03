@@ -1043,20 +1043,27 @@ async function startTraining() {
     }
 }
 
+// 5. 修正 resetGameForTraining 初始化數據
 function resetGameForTraining(level) {
     gameOver = false;
     blueKills = 0;
     redKills = 0;
+    lastBlueKills = 0; // 重置追蹤變數
+    lastRedKills = 0;
     roundCount = 1;
     currentTurn = 'blue';
+    isProcessing = false;
     
     blueTeamConfig = ['balanced', 'balanced', 'balanced'];
     redTeamConfig = ['assassin', 'speedster', 'tank'];
-    initGame();
+    initGame(); // 重新生成豹豹
     
     if (level === 1) {
-        // 等級 1: 藍隊不動且 HP 極低
-        leopards.filter(l => l.team === 'blue').forEach(l => { l.hp = 10; l.maxHp = 10; });
+        // 課程等級 1：藍隊豹豹極端虛弱且位置固定
+        leopards.filter(l => l.team === 'blue').forEach(l => { 
+            l.hp = 10; 
+            l.maxHp = 10; 
+        });
     }
 }
 
