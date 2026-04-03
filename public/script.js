@@ -1078,12 +1078,21 @@ function resetGameForTraining(level) {
     }
 }
 
-// 儲存模型到 LocalStorage
+// 🔥 修改 saveAIModel：同時儲存到瀏覽器並下載檔案以便上傳 GitHub
 async function saveAIModel() {
-    if (aiModel) {
-        await aiModel.save('localstorage://leopard-ppo-actor');
-        alert("AI 模型已匯出並儲存在瀏覽器中！單人模式現在會變得很強。");
+    if (!aiModel) {
+        alert("模型尚未訓練，無法下載！");
+        return;
     }
+    
+    // 1. 儲存在瀏覽器 LocalStorage，讓你在本地重新整理後依然可以使用
+    await aiModel.save('localstorage://leopard-ppo-model');
+    
+    // 2. 觸發瀏覽器下載 AI 檔案 (會產生 model.json 與 .bin 檔案)
+    // 下載後請將這些檔案上傳到 GitHub，並放置於 public/model/ 路徑下
+    await aiModel.save('downloads://leopard-ppo-model');
+    
+    alert("匯出成功！檔案已開始下載。\n請將下載的檔案放入 GitHub 專案的 public/model 檔案夾中。");
 }
 
 function toggleTrainingUI() {
