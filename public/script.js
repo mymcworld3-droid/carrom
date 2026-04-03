@@ -986,7 +986,6 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
-// 🔥 修改後的 startTraining：加入圖層切換邏輯，讓你看到戰場
 async function startTraining() {
     isTraining = true;
     gameMode = 'single';
@@ -994,12 +993,12 @@ async function startTraining() {
     // 切換 UI，隱藏選單並顯示遊戲圖層與訓練狀態列
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('game-layer').style.display = 'flex';
-    document.getElementById('training-ui').style.display = 'block';
+    // 🔥 修正 ID 為 training-status-bar
+    document.getElementById('training-status-bar').style.display = 'block';
     
     if (!aiModel) await initPPO();
 
     while (isTraining) {
-        // 重置環境
         resetGameForTraining(curriculumLevel);
         let episodeReward = 0;
         
@@ -1009,14 +1008,11 @@ async function startTraining() {
                 const prediction = aiModel.predict(state);
                 const action = await prediction.data();
                 
-                // 執行動作並等待物理停止
                 await performAIAction(action);
                 
-                // 計算獎勵
                 let reward = calculateReward();
                 episodeReward += reward;
                 
-                // 訓練模型
                 const target = tf.tensor2d([action]);
                 await aiModel.fit(state, target, {epochs: 1, verbose: 0});
                 
@@ -1024,17 +1020,13 @@ async function startTraining() {
                 prediction.dispose();
                 target.dispose();
             } else {
-                // 訓練中自動讓藍隊行動
                 makeRandomPlayerMove();
             }
 
-            // 處理渲染邏輯
             trainRender = document.getElementById('render-toggle').checked;
             if (trainRender) {
-                // 為了看清戰況，給予物理引擎運行的緩衝時間
                 await new Promise(r => setTimeout(r, 50)); 
             } else {
-                // 高速模式：快速跳過物理模擬
                 for(let i=0; i<8; i++) {
                     leopards.forEach(l => l.update());
                     resolveCollisions();
@@ -1043,14 +1035,12 @@ async function startTraining() {
             }
         }
         
-        // 更新數據
         trainStats.episodes++;
         trainStats.rewards.push(episodeReward);
         if (redKills >= 5) trainStats.wins++;
         
         updateTrainingUI();
         
-        // 課程晉級判斷
         if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.75 && trainStats.episodes > 10) {
             if (curriculumLevel < 4) {
                 curriculumLevel++;
