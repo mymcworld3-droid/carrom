@@ -1097,10 +1097,9 @@ function resetGameForTraining(level) {
     gameOver = false;
     blueKills = 0; redKills = 0;
     lastBlueKills = 0; lastRedKills = 0;
-    roundCount = 1; currentTurn = 'red'; // 訓練時讓 AI (紅隊) 先攻
+    roundCount = 1; currentTurn = 'red';
     isProcessing = false;
     
-    // 🔥 修正：重置慢動作與攝影機狀態，避免前一局結束時的特效帶入新一局
     isSlowMo = false;
     timeScale = 1.0;
     targetTimeScale = 1.0;
@@ -1112,26 +1111,24 @@ function resetGameForTraining(level) {
     camera.x = 400;
     camera.y = 300;
 
-    // 🔥 修正：清空殘留的特效文字與粒子，並強制隱藏可能開啟的結算 UI
     particles = [];
     damageTexts = [];
     document.getElementById('result-layer').style.display = 'none';
     document.getElementById('result-layer').classList.remove('show');
     
-    // 清空現有豹豹
     leopards = [];
 
     if (level === 1) {
-        // 第一階段：1隻全能豹 vs 1個不動木靶 (位於中心)
-        leopards.push(new Leopard(400, 500, 25, '#e74c3c', 'red', 1, 'balanced')); // AI
-        let target = new Leopard(400, 200, 35, '#3498db', 'blue', 2, 'tank'); // 木靶
-        target.hp = 999; target.maxHp = 999; // 極高 HP
+        leopards.push(new Leopard(400, 500, 25, '#e74c3c', 'red', 1, 'balanced'));
+        // 🔥 對手大小改回 25，與 AI 保持一致
+        let target = new Leopard(400, 200, 25, '#3498db', 'blue', 2, 'tank'); 
+        target.hp = 999; target.maxHp = 999;
         leopards.push(target);
-    } 
+    }
     else if (level === 2) {
         // 第二階段：1隻疾風豹 (加強牆壁反彈練習)
         leopards.push(new Leopard(150, 500, 25, '#e74c3c', 'red', 1, 'speedster'));
-        leopards.push(new Leopard(650, 150, 30, '#3498db', 'blue', 2, 'balanced'));
+        leopards.push(new Leopard(650, 150, 25, '#3498db', 'blue', 2, 'balanced'));
     } 
     else if (level === 3) {
         // 第三階段：戰吼豹 + 刺客豹 (隊友協作練習)
