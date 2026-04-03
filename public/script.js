@@ -909,6 +909,134 @@ function makeAIMove() {
     attacker.hasMoved = true; isProcessing = true;
 }
 
+async function startTraining() {
+    isTraining = true;
+    gameMode = 'single';
+    document.getElementById('training-ui').style.display = 'block';
+    if (!aiModel) await initPPO();
+
+    while (isTraining) {
+        // 重置遊戲環境 (根據課程等級)
+        resetGameForTraining(curriculumLevel);
+        let episodeReward = 0;
+        
+        while (!gameOver && isTraining) {
+            if (currentTurn === 'red') {
+                const state = getGameStateTensor();
+                const prediction = aiModel.predict(state);
+                const action = await prediction.data();
+                
+                // 執行動作
+                await performAIAction(action);
+                
+                // 計算獎勵 (Reward Function)
+                let reward = calculateReward();
+                episodeReward += reward;
+                
+                // PPO 訓練步進 (這裡簡化為直接線上學習)
+                const target = tf.tensor2d([action]);
+                await aiModel.fit(state, target, {epochs: 1, verbose: 0});
+                
+                state.dispose();
+                prediction.dispose();
+                target.dispose();
+            } else {
+                // 如果是玩家回合，訓練中自動隨機或使用舊 AI
+                makeRandomPlayerMove();
+            }
+
+            // 控制渲染開關
+            trainRender = document.getElementById('render-toggle').checked;
+            if (trainRender) {
+                await new Promise(r => setTimeout(r, 100)); // 慢速以便觀察
+            } else {
+                // 高速模式下不等待，直接跑物理
+                for(let i=0; i<5; i++) { // 物理步進加速
+                    leopards.forEach(l => l.update());
+                    resolveCollisions();
+                    checkTurnSystem();
+                }
+            }
+        }
+        
+        // 回合結束，更新統計
+        trainStats.episodes++;
+        trainStats.rewards.push(episodeReward);
+        if (redKills >= 5) trainStats.wins++;
+        
+        // 更新 UI
+        updateTrainingUI();
+        
+        // 課程晉級判斷
+        if (trainStats.wins / trainStats.episodes > 0.7 && trainStats.episodes > 20) {
+            if (curriculumLevel < 4) {
+                curriculumLevel++;
+                trainStats.wins = 0;
+                trainStats.episodes = 0;
+                alert(`課程晉級！目前等級: ${curriculumLevel}`);
+            }
+        }
+    }
+}
+
+function resetGameForTraining(level) {
+    gameOver = false;
+    blueKills = 0;
+    redKills = 0;
+    roundCount = 1;
+    currentTurn = 'blue';
+    
+    blueTeamConfig = ['balanced', 'balanced', 'balanced'];
+    redTeamConfig = ['assassin', 'speedster', 'tank'];
+    initGame();
+    
+    if (level === 1) {
+        // 等級 1: 藍隊不動且 HP 極低
+        leopards.filter(l => l.team === 'blue').forEach(l => { l.hp = 10; l.maxHp = 10; });
+    }
+}
+
+function calculateReward() {
+    let r = 0;
+    // 擊中敵人給獎勵
+    r += currentActionDamage * 0.1;
+    // 擊殺敵人大獎勵
+    if (blueKills > lastBlueKills) r += 50;
+    // 自己扣血扣分
+    if (redKills < lastRedKills) r -= 30;
+    return r;
+}
+
+// 儲存模型到 LocalStorage
+async function saveAIModel() {
+    if (aiModel) {
+        await aiModel.save('localstorage://leopard-ppo-actor');
+        alert("AI 模型已匯出並儲存在瀏覽器中！單人模式現在會變得很強。");
+    }
+}
+
+function toggleTrainingUI() {
+    const ui = document.getElementById('training-ui');
+    if (ui.style.display === 'none') {
+        startTraining();
+    } else {
+        stopTraining();
+    }
+}
+
+function stopTraining() {
+    isTraining = false;
+    document.getElementById('training-ui').style.display = 'none';
+}
+
+function updateTrainingUI() {
+    document.getElementById('curr-level').innerText = curriculumLevel;
+    document.getElementById('train-episodes').innerText = trainStats.episodes;
+    document.getElementById('win-rate').innerText = Math.round((trainStats.wins / trainStats.episodes) * 100) + "%";
+    const avg = trainStats.rewards.slice(-10).reduce((a, b) => a + b, 0) / 10;
+    document.getElementById('avg-reward').innerText = Math.round(avg);
+}
+
 function getPredictedCollision(attacker, dx, dy) {
     const angle = Math.atan2(dy, dx);
     const rayVx = Math.cos(angle); const rayVy = Math.sin(angle);
