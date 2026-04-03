@@ -1255,6 +1255,11 @@ function showBigAnnouncement(text, color = "white") {
 }
 
 function gameLoop() {
+    // 🔥 如果在訓練且不渲染，則跳過繪圖，只跑邏輯
+    if (isTraining && !trainRender) {
+        requestAnimationFrame(gameLoop);
+        return; 
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     updateCameraAndSlowMo();
     ctx.save();
