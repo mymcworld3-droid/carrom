@@ -973,14 +973,20 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
+// 🔥 修改後的 startTraining：加入圖層切換邏輯，讓你看到戰場
 async function startTraining() {
     isTraining = true;
     gameMode = 'single';
+    
+    // 切換 UI，隱藏選單並顯示遊戲圖層與訓練狀態列
+    document.getElementById('menu-layer').style.display = 'none';
+    document.getElementById('game-layer').style.display = 'flex';
     document.getElementById('training-ui').style.display = 'block';
+    
     if (!aiModel) await initPPO();
 
     while (isTraining) {
-        // 重置遊戲環境 (根據課程等級)
+        // 重置環境
         resetGameForTraining(curriculumLevel);
         let episodeReward = 0;
         
@@ -990,14 +996,14 @@ async function startTraining() {
                 const prediction = aiModel.predict(state);
                 const action = await prediction.data();
                 
-                // 執行動作
+                // 執行動作並等待物理停止
                 await performAIAction(action);
                 
-                // 計算獎勵 (Reward Function)
+                // 計算獎勵
                 let reward = calculateReward();
                 episodeReward += reward;
                 
-                // PPO 訓練步進 (這裡簡化為直接線上學習)
+                // 訓練模型
                 const target = tf.tensor2d([action]);
                 await aiModel.fit(state, target, {epochs: 1, verbose: 0});
                 
@@ -1005,17 +1011,18 @@ async function startTraining() {
                 prediction.dispose();
                 target.dispose();
             } else {
-                // 如果是玩家回合，訓練中自動隨機或使用舊 AI
+                // 訓練中自動讓藍隊行動
                 makeRandomPlayerMove();
             }
 
-            // 控制渲染開關
+            // 處理渲染邏輯
             trainRender = document.getElementById('render-toggle').checked;
             if (trainRender) {
-                await new Promise(r => setTimeout(r, 100)); // 慢速以便觀察
+                // 為了看清戰況，給予物理引擎運行的緩衝時間
+                await new Promise(r => setTimeout(r, 50)); 
             } else {
-                // 高速模式下不等待，直接跑物理
-                for(let i=0; i<5; i++) { // 物理步進加速
+                // 高速模式：快速跳過物理模擬
+                for(let i=0; i<8; i++) {
                     leopards.forEach(l => l.update());
                     resolveCollisions();
                     checkTurnSystem();
@@ -1023,21 +1030,18 @@ async function startTraining() {
             }
         }
         
-        // 回合結束，更新統計
+        // 更新數據
         trainStats.episodes++;
         trainStats.rewards.push(episodeReward);
         if (redKills >= 5) trainStats.wins++;
         
-        // 更新 UI
         updateTrainingUI();
         
         // 課程晉級判斷
-        if (trainStats.wins / trainStats.episodes > 0.7 && trainStats.episodes > 20) {
+        if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.75 && trainStats.episodes > 10) {
             if (curriculumLevel < 4) {
                 curriculumLevel++;
-                trainStats.wins = 0;
-                trainStats.episodes = 0;
-                alert(`課程晉級！目前等級: ${curriculumLevel}`);
+                showBigAnnouncement(`課程晉級！目前等級: ${curriculumLevel}`, "#ffcc00");
             }
         }
     }
