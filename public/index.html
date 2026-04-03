@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>豹豹碰碰大作戰 - 英雄崛起</title>
@@ -20,6 +21,9 @@
                 </button>
                 <button class="btn online" onclick="enterSelection('online')">
                     <span class="btn-icon">🌐</span> 連線大戰 (Socket.io)
+                </button>
+                <button id="ai-train-btn" class="btn" style="border-color: #ffcc00; color: #ffcc00;" onclick="toggleTrainingUI()">
+                    <span class="btn-icon">🧠</span> AI 強化訓練 (PPO)
                 </button>
             </div>
             <div class="footer-hint">建議使用行動裝置或滑鼠拖曳進行遊戲</div>
@@ -112,6 +116,20 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <div id="training-ui" style="display: none; position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 10px; z-index: 3000; font-size: 14px; width: 250px;">
+        <h3 style="margin-top:0; color:#ffcc00;">AI 課程訓練中...</h3>
+        <div id="train-stats">
+            課程等級: <span id="curr-level">1</span><br>
+            訓練回合: <span id="train-episodes">0</span><br>
+            目前勝率: <span id="win-rate">0%</span><br>
+            累積獎勵: <span id="avg-reward">0</span>
+        </div>
+        <hr>
+        <label><input type="checkbox" id="render-toggle" checked> 顯示畫面 (渲染)</label><br>
+        <button class="btn" style="width:100%; margin-top:10px; font-size:14px; padding:5px;" onclick="saveAIModel()">💾 匯出並應用模型</button>
+        <button class="btn-quit" onclick="stopTraining()">停止訓練</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
