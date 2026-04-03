@@ -912,23 +912,25 @@ async function makeAIMove() {
     isProcessing = true;
 }
 
-// 🔥 修改 performAIAction (約第 551 行)
 async function performAIAction(action) {
+    // 🔥 修正：必須從 action 陣列中解構出數值
+    const [targetIdx, angleNorm, forceNorm] = action;
+
     const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
     if (myLeopards.length === 0) {
-        // 如果沒人能動，標記正在處理中，讓 checkTurnSystem 接手換邊
         isProcessing = true; 
         return;
     }
 
+    // 現在 targetIdx 已經定義，可以正常運算
     const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
     
     const angle = angleNorm * Math.PI; 
     const force = (forceNorm + 1) * 0.5 * MAX_DRAG; 
 
     activeStriker = attacker;
-    currentActionHits = 0; // 🔥 發動前重置計數
-    currentActionDamage = 0; // 🔥 發動前重置傷害
+    currentActionHits = 0;
+    currentActionDamage = 0;
     attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
     attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
     attacker.hasMoved = true;
