@@ -472,6 +472,7 @@ function resolveCollisions() {
                         victim.hp -= attacker.atk;
                         totalDamageDealt += attacker.atk;
                         currentActionDamage += attacker.atk;
+                        currentActionHits++; // 🔥 每次造成傷害就計數一次
                         
                         damageTexts.push(new DamageText(victim.x, victim.y - 40, attacker.atk, victim.hp <= 0));
                         
