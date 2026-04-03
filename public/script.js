@@ -830,6 +830,28 @@ function quitRoom() {
 
 function makeAIMove() {
     if (gameOver || isProcessing) return;
+    // 如果有訓練好的模型，優先使用模型
+    if (aiModel && gameMode === 'single') {
+        const state = getGameStateTensor();
+        const prediction = aiModel.predict(state);
+        const [targetIdx, angleNorm, forceNorm] = await prediction.data();
+        
+        // 解析動作
+        const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
+        if (myLeopards.length === 0) return;
+        
+        const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
+        const angle = angleNorm * Math.PI; // -PI ~ PI
+        const force = (forceNorm + 1) * 0.5 * MAX_DRAG; // 0 ~ MAX_DRAG
+
+        attacker.vx = Math.cos(angle) * force * LAUNCH_FORCE_MULT;
+        attacker.vy = Math.sin(angle) * force * LAUNCH_FORCE_MULT;
+        attacker.hasMoved = true; 
+        isProcessing = true;
+        state.dispose();
+        prediction.dispose();
+        return;
+    }
     const aiLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
     if (aiLeopards.length === 0) return;
     const attacker = aiLeopards[Math.floor(Math.random() * aiLeopards.length)];
