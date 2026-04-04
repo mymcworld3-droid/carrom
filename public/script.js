@@ -923,11 +923,24 @@ function getGameStateTensor() {
     return tf.tensor2d([state]);
 }
 
-// 🔥 物理引擎加速執行函式
+// 🔥 修改：物理引擎執行函式，加入「目標鎖定」邏輯
 function runPhysicsSteps(count) {
     for (let i = 0; i < count; i++) {
         leopards.forEach(l => l.update());
         resolveCollisions();
+        
+        // 🔥 核心修正：如果等級是 1，強制鎖定藍隊位置與速度
+        if (curriculumLevel === 1) {
+            leopards.forEach(l => {
+                if (l.team === 'blue') {
+                    l.x = 400;  // 永遠固定在 X: 400
+                    l.y = 200;  // 永遠固定在 Y: 200
+                    l.vx = 0;   // 速度強制歸零
+                    l.vy = 0;   // 速度強制歸零
+                }
+            });
+        }
+        
         checkTurnSystem();
     }
 }
