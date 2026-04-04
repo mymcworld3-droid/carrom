@@ -1085,6 +1085,28 @@ function calculateReward() {
     return r;
 }
 
+// 🔥 計算並紀錄綜合評分
+function recordSessionPerformance() {
+    // 綜合評分公式：(平均傷害 * 0.5) + (命中率 * 50) - (平均耗時回合 * 2)
+    const avgDamage = sessionData.totalDamage / Math.max(1, roundCount);
+    const accuracy = sessionData.totalHits / Math.max(1, trainStats.episodes);
+    const score = Math.max(0, (avgDamage * 0.5) + (accuracy * 50) - (roundCount * 0.5));
+
+    chartLabels.push(`S${chartLabels.length + 1}`);
+    chartScores.push(score.toFixed(2));
+
+    // 只保留最近 20 筆數據，避免圖表太擠
+    if (chartLabels.length > 20) {
+        chartLabels.shift();
+        chartScores.shift();
+    }
+
+    if (trainingChart) trainingChart.update();
+
+    // 重置單次大賽數據
+    sessionData = { totalDamage: 0, totalHits: 0, episodesInSession: 0, totalRounds: 0 };
+}
+
 // 6. 在進入選單時就嘗試讀取模型，讓單人模式生效
 const originalEnterSelection = window.enterSelection;
 window.enterSelection = async function(mode) {
