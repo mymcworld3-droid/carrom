@@ -235,8 +235,15 @@ class Leopard {
             particles.push(new Particle(this.x, this.y, this.color));
         }
         
-        if (this.team === 'blue') redKills++;
-        else blueKills++;
+        if (this.team === 'blue') {
+            redKills++;
+            // 🔥 每當藍隊 (Boss/目標) 陣亡，立即錄評分並更新圖表
+            if (isTraining) {
+                recordSessionPerformance();
+            }
+        } else {
+            blueKills++;
+        }
         
         updateExternalUI();
         checkWinCondition();
