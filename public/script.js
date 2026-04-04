@@ -1307,12 +1307,18 @@ function getPointerPos(e) {
 
 function handleStart(e) {
     if (isProcessing || gameOver) return;
-    // 訓練模式下，只有開啟 isManualDemo 才能手動操作
-    if (isTraining && !isManualDemo) return; 
+    
+    // 🔥 修正：如果是訓練中，必須同時開啟手動示範才能操作
+    if (isTraining && !isManualDemo) {
+        console.log("AI 正在訓練中，如需操作請開啟「手動示範」");
+        return; 
+    }
+    
     if (gameMode === 'online' && currentTurn !== myTeam) return;
 
     const pos = getPointerPos(e);
     leopards.forEach(l => {
+        // 確保你拉的是目前回合的隊伍（通常是紅隊）
         if (l.team === currentTurn && !l.hasMoved && !l.isDying) {
             let dist = Math.sqrt((pos.x - l.x)**2 + (pos.y - l.y)**2);
             if (dist < l.radius * 1.5) { 
@@ -1320,7 +1326,7 @@ function handleStart(e) {
                 isDragging = true; 
                 dragEndPos = { x: pos.x, y: pos.y };
 
-                // 錄製狀態：抓取點擊瞬間的戰場畫面
+                // 錄製狀態
                 if (isTraining && isManualDemo) {
                     const stateTensor = getGameStateTensor();
                     pendingMemory = {
@@ -1332,7 +1338,6 @@ function handleStart(e) {
             }
         }
     });
-    if (isDragging && e.cancelable) e.preventDefault();
 }
 
 function handleMove(e) {
