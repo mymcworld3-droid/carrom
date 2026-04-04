@@ -1066,6 +1066,8 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
+let epsilon = 0.3;
+
 async function startTraining() {
     isTraining = true;
     if (!aiModel) await initPPO();
@@ -1076,31 +1078,36 @@ async function startTraining() {
 
     while (isTraining) {
         resetGameForTraining(curriculumLevel);
-        
         while (!gameOver && isTraining) {
-            if (isProcessing) {
-                await new Promise(r => setTimeout(r, 30)); 
-                continue;
-            }
+            if (isProcessing) { await new Promise(r => setTimeout(r, 30)); continue; }
         
             if (currentTurn === 'red') {
-                // 🔥 核心修正：如果開啟手動示範，暫停 AI 邏輯，等待玩家拉動
-                if (isManualDemo) {
-                    await new Promise(r => setTimeout(r, 100)); // 每 0.1 秒檢查一次
-                    continue; 
-                }
+                if (isManualDemo) { await new Promise(r => setTimeout(r, 100)); continue; }
 
-                // 🤖 以下是正常的 AI 預測邏輯
                 const state = getGameStateTensor();
-                const prediction = aiModel.predict(state);
-                let action = await prediction.data();
+                let action;
+                
+                // 🚀 改進 1：加入隨機探索 (Epsilon-Greedy)
+                if (Math.random() < epsilon) {
+                    // 隨機產生動作：[目標, 角度, 力道]
+                    action = [Math.random(), (Math.random() * 2 - 1), (Math.random() * 2 - 1)];
+                } else {
+                    const prediction = aiModel.predict(state);
+                    action = await prediction.data();
+                    prediction.dispose();
+                }
                 
                 await performAIAction(action);
                 
+                // 🚀 改進 2：根據「獎勵」決定是否學習
                 let reward = calculateReward();
-                const target = tf.tensor2d([action]);
-                await aiModel.fit(state, target, {epochs: 1, verbose: 0});
-                state.dispose(); prediction.dispose(); target.dispose();
+                if (reward > 0) {
+                    // 只有打得好（獎勵正值）時，才叫 AI 記住這個動作
+                    const target = tf.tensor2d([action]);
+                    await aiModel.fit(state, target, {epochs: 1, verbose: 0});
+                    target.dispose();
+                }
+                state.dispose();
             } else {
                 makeRandomPlayerMove();
             }
@@ -1112,6 +1119,7 @@ async function startTraining() {
             }
         }
         
+        epsilon = Math.max(0.05, epsilon * 0.998); 
         trainStats.episodes++;
         updateTrainingUI();
     }
