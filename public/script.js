@@ -909,19 +909,25 @@ async function initPPO() {
 
 function getGameStateTensor() {
     let state = [];
-    const myLeopard = leopards.find(l => l.team === 'red' && !l.isDying) || leopards[0];
     
-    leopards.forEach(l => {
-        // 1. 座標與 HP 基礎資訊
-        state.push(l.x / 800, l.y / 600, l.hp / 150, l.team === 'red' ? 1 : 0);
-        
-        // 🔥 2. 加入相對位置資訊 (幫助神經網路快速理解空間關係)
-        state.push((l.x - myLeopard.x) / 800);
-        state.push((l.y - myLeopard.y) / 600);
+    // 排序豹豹確保輸入順序穩定 (依 ID 排序)，避免 AI 混亂
+    const sortedLeopards = [...leopards].sort((a, b) => a.id - b.id);
+    
+    sortedLeopards.forEach(l => {
+        // 1. 座標資訊 (0~1)
+        state.push(l.x / 800);
+        state.push(l.y / 600);
+        // 2. 生命值比例 (0~1)
+        state.push(l.hp / 150);
+        // 3. 隊伍標籤 (1: 紅隊/自己, 0: 藍隊/對手)
+        state.push(l.team === 'red' ? 1 : 0);
+        // 4. 是否可彈射 (1: 活著且本回合尚未行動, 0: 已動過或死亡)
+        const canLaunch = (!l.isDying && !l.hasMoved) ? 1 : 0;
+        state.push(canLaunch);
     });
     
-    // 確保維度固定，若豹豹不足則補零
-    while(state.length < 48) state.push(0); // 增加維度到 48
+    // 確保維度固定為 30
+    while(state.length < 30) state.push(0); 
     return tf.tensor2d([state]);
 }
 
