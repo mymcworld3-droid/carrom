@@ -1091,9 +1091,7 @@ async function startTraining() {
                 const state = getGameStateTensor();
                 let action;
                 
-                // 🚀 改進 1：加入隨機探索 (Epsilon-Greedy)
                 if (Math.random() < epsilon) {
-                    // 隨機產生動作：[目標, 角度, 力道]
                     action = [Math.random(), (Math.random() * 2 - 1), (Math.random() * 2 - 1)];
                 } else {
                     const prediction = aiModel.predict(state);
@@ -1103,17 +1101,20 @@ async function startTraining() {
                 
                 await performAIAction(action);
                 
-                // 🚀 改進 2：根據「獎勵」決定是否學習
                 let reward = calculateReward();
                 if (reward > 0) {
-                    // 只有打得好（獎勵正值）時，才叫 AI 記住這個動作
                     const target = tf.tensor2d([action]);
                     await aiModel.fit(state, target, {epochs: 1, verbose: 0});
                     target.dispose();
                 }
                 state.dispose();
             } else {
-                makeRandomPlayerMove();
+                // 🔥 修正：如果等級是 1，讓藍隊直接結束回合而不移動
+                if (curriculumLevel === 1) {
+                    leopards.filter(l => l.team === 'blue').forEach(l => l.hasMoved = true);
+                } else {
+                    makeRandomPlayerMove();
+                }
             }
 
             if (document.getElementById('render-toggle').checked) {
