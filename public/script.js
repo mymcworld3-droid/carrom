@@ -1066,7 +1066,6 @@ window.enterSelection = async function(mode) {
     originalEnterSelection(mode);
 };
 
-// 🔥 修改 startTraining 中的循環 (約第 615 行)
 async function startTraining() {
     isTraining = true;
     if (!aiModel) await initPPO();
@@ -1075,63 +1074,46 @@ async function startTraining() {
     document.getElementById('game-layer').style.display = 'flex';
     document.getElementById('training-status-bar').style.display = 'block';
 
-    let explorationRate = 0.5; 
-
     while (isTraining) {
         resetGameForTraining(curriculumLevel);
-        let episodeReward = 0;
         
-        // 在 startTraining 內部的 while 迴圈中
         while (!gameOver && isTraining) {
-            // 如果物理還在跑，就一直等，直到 checkTurnSystem 把 isProcessing 設為 false
             if (isProcessing) {
                 await new Promise(r => setTimeout(r, 30)); 
                 continue;
             }
         
             if (currentTurn === 'red') {
-                // AI 思考並執行
+                // 🔥 核心修正：如果開啟手動示範，暫停 AI 邏輯，等待玩家拉動
+                if (isManualDemo) {
+                    await new Promise(r => setTimeout(r, 100)); // 每 0.1 秒檢查一次
+                    continue; 
+                }
+
+                // 🤖 以下是正常的 AI 預測邏輯
                 const state = getGameStateTensor();
                 const prediction = aiModel.predict(state);
                 let action = await prediction.data();
                 
-                // 執行動作 (這會把 isProcessing 設為 true)
                 await performAIAction(action);
                 
                 let reward = calculateReward();
-                episodeReward += reward;
-                
                 const target = tf.tensor2d([action]);
                 await aiModel.fit(state, target, {epochs: 1, verbose: 0});
-                
                 state.dispose(); prediction.dispose(); target.dispose();
             } else {
                 makeRandomPlayerMove();
             }
 
-            // 🔥 關鍵：無論是否顯示畫面，都必須強制 yield 執行緒，讓物理引擎 (gameLoop) 跑回合判定
             if (document.getElementById('render-toggle').checked) {
                 await tf.nextFrame();
             } else {
-                await new Promise(r => setTimeout(r, 1)); // 非渲染模式下給予極短暫停防止瀏覽器凍結
+                await new Promise(r => setTimeout(r, 1));
             }
         }
         
         trainStats.episodes++;
-        trainStats.rewards.push(episodeReward);
-        if (blueKills > redKills) trainStats.wins++;
-        
-        explorationRate = Math.max(0.05, explorationRate * 0.998);
         updateTrainingUI();
-        
-        // 晉級判斷
-        if (trainStats.wins / Math.max(1, trainStats.episodes % 20) > 0.8 && trainStats.episodes > 10) {
-            if (curriculumLevel < 4) {
-                curriculumLevel++;
-                showBigAnnouncement(`課程晉級：Level ${curriculumLevel}`, "#ffcc00");
-                trainStats.wins = 0; trainStats.episodes = 0;
-            }
-        }
     }
 }
 
