@@ -1143,13 +1143,16 @@ async function startTraining() {
     }
 }
 
+// 🔥 修改：重置訓練環境
 function resetGameForTraining(level) {
     gameOver = false;
     blueKills = 0; redKills = 0;
     lastBlueKills = 0; lastRedKills = 0;
-    roundCount = 1; currentTurn = 'red';
+    roundCount = 1; 
+    currentTurn = 'red'; // 訓練時永遠由紅隊先攻
     isProcessing = false;
     
+    // 重置物理與攝影機狀態
     isSlowMo = false;
     timeScale = 1.0;
     targetTimeScale = 1.0;
@@ -1169,13 +1172,21 @@ function resetGameForTraining(level) {
     leopards = [];
 
     if (level === 1) {
-        leopards.push(new Leopard(400, 500, 25, '#e74c3c', 'red', 1, 'balanced'));
-        // 🔥 對手大小改回 25，與 AI 保持一致
+        // 紅隊：隨機出現在下方區域，增加練習多樣性
+        const startX = 200 + Math.random() * 400;
+        leopards.push(new Leopard(startX, 500, 25, '#e74c3c', 'red', 1, 'balanced'));
+        
+        // 🔥 藍隊：完全固定的目標靶
         let target = new Leopard(400, 200, 25, '#3498db', 'blue', 2, 'tank'); 
-        target.hp = 999; target.maxHp = 999;
+        target.hp = 999; 
+        target.maxHp = 999;
         leopards.push(target);
     }
     else if (level === 2) {
+        // 第二階段：練習對付會被撞飛的目標
+        leopards.push(new Leopard(150, 500, 25, '#e74c3c', 'red', 1, 'speedster'));
+        leopards.push(new Leopard(650, 150, 25, '#3498db', 'blue', 2, 'balanced'));
+    }
         // 第二階段：1隻疾風豹 (加強牆壁反彈練習)
         leopards.push(new Leopard(150, 500, 25, '#e74c3c', 'red', 1, 'speedster'));
         leopards.push(new Leopard(650, 150, 25, '#3498db', 'blue', 2, 'balanced'));
