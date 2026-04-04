@@ -1256,11 +1256,17 @@ async function saveAIModel() {
     alert("匯出成功！檔案已開始下載。\n請將下載的檔案放入 GitHub 專案的 public/model 檔案夾中。");
 }
 
+// 🔥 修改 toggleTrainingUI
 function toggleTrainingUI() {
     const ui = document.getElementById('training-status-bar');
+    const chart = document.getElementById('chart-overlay');
+    
     if (ui.style.display === 'none') {
+        if (!trainingChart) initChart(); // 第一次開啟時初始化圖表
+        chart.style.display = 'block';
         startTraining();
     } else {
+        chart.style.display = 'none';
         stopTraining();
     }
 }
