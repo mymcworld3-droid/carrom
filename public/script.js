@@ -832,7 +832,6 @@ let trainingSpeed = 1;
 let isManualDemo = false;      // 是否開啟手動示範
 let userMemories = [];         // 存放成功擊中的操作紀錄
 let pendingMemory = null;      // 暫存目前的動作，等物理跑完判定
-let currentActionHits = 0;     // 本次回合碰撞次數
 
 // 🔥 新增：讓 AI 學習剛剛錄製的高手動作
 async function trainFromUserMemories() {
