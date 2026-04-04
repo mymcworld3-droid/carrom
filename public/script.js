@@ -1110,7 +1110,8 @@ async function startTraining() {
                 let action;
                 
                 if (Math.random() < epsilon) {
-                    action = [Math.random(), (Math.random() * 2 - 1), (Math.random() * 2 - 1)];
+                    // 🔥 隨機動作也改為只有 2 個數值
+                    action = [(Math.random() * 2 - 1), (Math.random() * 2 - 1)];
                 } else {
                     const prediction = aiModel.predict(state);
                     action = await prediction.data();
