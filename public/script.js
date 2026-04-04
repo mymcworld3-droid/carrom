@@ -893,13 +893,15 @@ async function initPPO() {
             aiModel = await tf.loadLayersModel('./model/leopard-ppo-model.json');
         }
     } catch (e) {
-        console.log("建立新的 AI 神經網路 (維度: 48)...");
-        // 🔥 修正：這裡的 shape 必須與 getGameStateTensor 的 48 維一致
-        const input = tf.input({shape: [48]}); 
+        console.log("建立新的 AI 神經網路 (維度: 30, 輸出: 2)...");
+        // 🔥 每個豹豹 5 個訊息：X, Y, HP, Team, IsReady (是否可彈射)
+        // 6 隻豹豹共 30 維
+        const input = tf.input({shape: [30]}); 
         let l1 = tf.layers.dense({units: 128, activation: 'relu'}).apply(input);
         let l2 = tf.layers.dense({units: 128, activation: 'relu'}).apply(l1);
         
-        const output = tf.layers.dense({units: 3, activation: 'tanh'}).apply(l2);
+        // 輸出只有 2 個：[角度, 力道]
+        const output = tf.layers.dense({units: 2, activation: 'tanh'}).apply(l2);
         aiModel = tf.model({inputs: input, outputs: output});
         aiModel.compile({optimizer: tf.train.adam(0.0005), loss: 'meanSquaredError'});
     }
