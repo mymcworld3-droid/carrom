@@ -1393,10 +1393,9 @@ function checkWinCondition() {
         const winner = blueKills >= 5 ? 'blue' : 'red';
 
         if (isTraining) {
-            // 當魔王(藍隊)死掉 5 次，視為完成一個訓練單元
+            // 訓練模式下僅累計勝場，圖表更新已移至 die() 處理
             if (winner === 'blue') {
                 trainStats.wins++;
-                recordSessionPerformance(); 
             }
         } else {
             showFinalResult(winner);
