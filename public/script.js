@@ -1403,11 +1403,10 @@ function handleEnd(e) {
 
         if (selectedLeopard.type === 'speedster') { vx *= 1.5; vy *= 1.5; }
 
-        // 錄製動作：將向量轉回 AI 能理解的 normalized 數值
         if (isTraining && isManualDemo && pendingMemory) {
             const angle = Math.atan2(dy, dx) / Math.PI;
-            const force = (dist / MAX_DRAG) * 2 - 1; // 轉回 -1 ~ 1 區間
-            pendingMemory.action = [0, angle, force]; // 這裡簡化 targetIdx 為 0
+            const force = (dist / MAX_DRAG) * 2 - 1; 
+            pendingMemory.action = [angle, force]; 
         }
 
         if (gameMode === 'online') {
