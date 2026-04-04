@@ -994,17 +994,14 @@ async function makeAIMove() {
 }
 
 async function performAIAction(action) {
-    // 🔥 修正：必須從 action 陣列中解構出數值
-    const [targetIdx, angleNorm, forceNorm] = action;
+    // 🔥 移除 targetIdx，只接收角度與力道
+    const [angleNorm, forceNorm] = action;
 
     const myLeopards = leopards.filter(l => l.team === 'red' && !l.hasMoved && !l.isDying);
-    if (myLeopards.length === 0) {
-        isProcessing = true; 
-        return;
-    }
+    if (myLeopards.length === 0) return;
 
-    // 現在 targetIdx 已經定義，可以正常運算
-    const attacker = myLeopards[Math.floor(Math.abs(targetIdx) * myLeopards.length) % myLeopards.length];
+    // AI 自動選擇目前清單中第一隻可動的豹豹
+    const attacker = myLeopards[0];
     
     const angle = angleNorm * Math.PI; 
     const force = (forceNorm + 1) * 0.5 * MAX_DRAG; 
