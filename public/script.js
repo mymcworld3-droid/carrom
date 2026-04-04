@@ -1248,6 +1248,47 @@ function updateTrainingUI() {
     document.getElementById('win-rate').innerText = Math.round((trainStats.wins / trainStats.episodes) * 100) + "%";
 }
 
+// 🔥 圖表相關變數
+let trainingChart = null;
+let chartLabels = [];
+let chartScores = [];
+let sessionData = {
+    totalDamage: 0,
+    totalHits: 0,
+    episodesInSession: 0,
+    totalRounds: 0
+};
+
+// 🔥 初始化折線圖
+function initChart() {
+    const ctx = document.getElementById('trainingChart').getContext('2d');
+    trainingChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: '綜合戰力評分',
+                data: chartScores,
+                borderColor: '#ffcc00',
+                backgroundColor: 'rgba(255, 204, 0, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#888' } },
+                x: { grid: { display: false }, ticks: { color: '#888' } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
+
 function getPredictedCollision(attacker, dx, dy) {
     const angle = Math.atan2(dy, dx);
     const rayVx = Math.cos(angle); const rayVy = Math.sin(angle);
