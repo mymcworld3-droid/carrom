@@ -1342,11 +1342,15 @@ function updateExternalUI() {
 function checkWinCondition() {
     if (blueKills >= 5 || redKills >= 5) {
         gameOver = true;
-        
         const winner = blueKills >= 5 ? 'blue' : 'red';
-        
-        // 🔥 修正：訓練模式下不顯示結算畫面，避免干擾自動訓練流程
-        if (!isTraining) {
+
+        if (isTraining) {
+            // 當魔王(藍隊)死掉 5 次，視為完成一個訓練單元
+            if (winner === 'blue') {
+                trainStats.wins++;
+                recordSessionPerformance(); 
+            }
+        } else {
             showFinalResult(winner);
         }
     }
