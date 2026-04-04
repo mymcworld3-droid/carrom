@@ -847,11 +847,15 @@ async function trainFromUserMemories() {
     const states = tf.tensor2d(userMemories.map(m => m.state));
     const actions = tf.tensor2d(userMemories.map(m => m.action));
 
+    // 🚀 改進 3：大幅增加高手紀錄的訓練次數
+    // 讓 AI 針對你的示範「深思熟慮」50 次，而不是原本的 10 次
     await aiModel.fit(states, actions, {
-        epochs: 10, // 對高手紀錄重複練習 10 次
+        epochs: 50, 
         shuffle: true,
         callbacks: {
-            onEpochEnd: (epoch, logs) => console.log(`學習進度: ${epoch+1}/10, 誤差: ${logs.loss.toFixed(4)}`)
+            onEpochEnd: (epoch, logs) => {
+                if (epoch % 10 === 0) console.log(`特訓中... 第 ${epoch} 回合`);
+            }
         }
     });
 
