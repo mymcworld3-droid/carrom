@@ -1098,18 +1098,15 @@ function calculateReward() {
     return r;
 }
 
-// 🔥 計算並紀錄綜合評分 (每死一次觸發)
+// 🔥 修改 script.js 中的 recordSessionPerformance 函式
 function recordSessionPerformance() {
-    // 評分指標：
-    // 1. 傷害效率：總傷 / 消耗回合 (越高越好)
-    // 2. 命中率：總命中次數 / 總彈射次數 (越準越好)
-    // 3. 速度懲罰：回合數越少，分數越高
-    
+    // 命中率：總命中次數 / 總彈射次數
     const accuracy = sessionData.totalHits / Math.max(1, trainStats.episodes);
+    // 效率：平均每回合造成的傷害
     const efficiency = sessionData.totalDamage / Math.max(1, roundCount);
     
-    // 綜合能力評分公式
-    const score = (efficiency * 0.8) + (accuracy * 100) - (roundCount * 2);
+    // 🔥 優化評分公式：增加傷害權重，並確保回合扣分不會讓分數太快變 0
+    const score = (efficiency * 1.5) + (accuracy * 200) - (roundCount * 0.1);
     const finalScore = Math.max(0, score).toFixed(2);
 
     // 更新圖表標籤與數據
