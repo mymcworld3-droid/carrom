@@ -1087,6 +1087,12 @@ function calculateReward() {
         if (blueKills >= 5) r += 100;
     }
 
+    // 🔥 關鍵新增：將本回合的實際數據累加到 sessionData 中
+    if (isTraining) {
+        sessionData.totalDamage += currentActionDamage;
+        sessionData.totalHits += (currentActionHits > 0 ? 1 : 0); // 只要有打到就算 1 次成功命中
+    }
+
     lastBlueKills = blueKills;
     lastRedKills = redKills;
     return r;
