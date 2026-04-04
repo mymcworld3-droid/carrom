@@ -1092,26 +1092,39 @@ function calculateReward() {
     return r;
 }
 
-// 🔥 計算並紀錄綜合評分
+// 🔥 計算並紀錄綜合評分 (每死一次觸發)
 function recordSessionPerformance() {
-    // 綜合評分公式：(平均傷害 * 0.5) + (命中率 * 50) - (平均耗時回合 * 2)
-    const avgDamage = sessionData.totalDamage / Math.max(1, roundCount);
+    // 評分指標：
+    // 1. 傷害效率：總傷 / 消耗回合 (越高越好)
+    // 2. 命中率：總命中次數 / 總彈射次數 (越準越好)
+    // 3. 速度懲罰：回合數越少，分數越高
+    
     const accuracy = sessionData.totalHits / Math.max(1, trainStats.episodes);
-    const score = Math.max(0, (avgDamage * 0.5) + (accuracy * 50) - (roundCount * 0.5));
+    const efficiency = sessionData.totalDamage / Math.max(1, roundCount);
+    
+    // 綜合能力評分公式
+    const score = (efficiency * 0.8) + (accuracy * 100) - (roundCount * 2);
+    const finalScore = Math.max(0, score).toFixed(2);
 
-    chartLabels.push(`S${chartLabels.length + 1}`);
-    chartScores.push(score.toFixed(2));
+    // 更新圖表標籤與數據
+    const deathCount = chartLabels.length + 1;
+    chartLabels.push(`Kill ${deathCount}`);
+    chartScores.push(finalScore);
 
-    // 只保留最近 20 筆數據，避免圖表太擠
-    if (chartLabels.length > 20) {
+    // 保持圖表整潔，顯示最近 30 次擊殺數據
+    if (chartLabels.length > 30) {
         chartLabels.shift();
         chartScores.shift();
     }
 
-    if (trainingChart) trainingChart.update();
+    if (trainingChart) {
+        trainingChart.update();
+    }
 
-    // 重置單次大賽數據
-    sessionData = { totalDamage: 0, totalHits: 0, episodesInSession: 0, totalRounds: 0 };
+    // 重置此目標的統計數據，準備下一個目標
+    sessionData.totalDamage = 0;
+    sessionData.totalHits = 0;
+    // 注意：roundCount 會在 resetGameForTraining 中重置
 }
 
 // 6. 在進入選單時就嘗試讀取模型，讓單人模式生效
