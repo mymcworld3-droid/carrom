@@ -953,6 +953,12 @@ function runPhysicsSteps(count) {
     }
 }
 
+function updateSessionStats(reward) {
+    if (!isTraining) return;
+    sessionData.totalDamage += currentActionDamage;
+    sessionData.totalHits += currentActionHits;
+}
+
 // 1. 修正 makeAIMove 增加 async
 async function makeAIMove() {
     if (gameOver || isProcessing) return;
